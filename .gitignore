@@ -2,3 +2,5 @@ venv
 .mypy_cache
 .env
 __pycache__
+node_modules
+.next

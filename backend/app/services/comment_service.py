@@ -2,7 +2,7 @@ from typing import List
 from uuid import UUID
 from datetime import datetime
 from fastapi import HTTPException, status as http_status
-from app.db.database import get_supabase, exec_query, exec_single
+from app.db.database import get_supabase, exec_query, exec_single, first_row
 from app.models.comment import Comment, CommentCreate, CommentUpdate
 
 
@@ -14,18 +14,22 @@ class CommentService:
     @classmethod
     async def create_comment(cls, payload: CommentCreate, user_id: UUID) -> Comment:
         c = cls._c()
-        resp = exec_single(
-            c.table("comments")
-            .insert(
+        resp = exec_query(
+            c.table("comments").insert(
                 {
                     "ticket_id": str(payload.ticket_id),
                     "user_id": str(user_id),
                     "content": payload.content,
-                }
+                },
+                returning="representation",
             )
-            .select("*")
         )
-        return Comment(**resp.data)
+        row = first_row(resp.data)
+        if not row:
+            raise HTTPException(
+                http_status.HTTP_400_BAD_REQUEST, "Create comment failed"
+            )
+        return Comment(**row)
 
     @classmethod
     async def list_comments(cls, ticket_id: UUID) -> List[Comment]:
@@ -43,16 +47,24 @@ class CommentService:
         cls, comment_id: UUID, patch: CommentUpdate, user_id: UUID
     ) -> Comment:
         c = cls._c()
-        resp = exec_single(
+        resp = exec_query(
             c.table("comments")
             .update(
-                {"content": patch.content, "updated_at": datetime.utcnow().isoformat()}
+                {"content": patch.content, "updated_at": datetime.utcnow().isoformat()},
+                returning="representation",
             )
             .eq("id", str(comment_id))
-            .select("*"),
-            not_found_msg="Comment not found",
         )
-        return Comment(**resp.data)
+        row = first_row(resp.data)
+        if not row:
+            exec_single(
+                c.table("comments").select("*").eq("id", str(comment_id)),
+                not_found_msg="Comment not found",
+            )
+            raise HTTPException(
+                http_status.HTTP_400_BAD_REQUEST, "Update comment failed"
+            )
+        return Comment(**row)
 
     @classmethod
     async def delete_comment(cls, comment_id: UUID, user_id: UUID) -> None:

@@ -1,7 +1,7 @@
 from typing import List
 from uuid import UUID
 from fastapi import HTTPException, status as http_status
-from app.db.database import get_supabase, exec_query, exec_single
+from app.db.database import get_supabase, exec_query, exec_single, first_row
 from app.models.tag import Tag, TagCreate
 
 
@@ -14,18 +14,22 @@ class TagService:
     async def create_tag(cls, tag_data: TagCreate, user_id: UUID) -> Tag:
         c = cls._c()
         name = tag_data.name.lower()
-        # Try find
         try:
             existing = exec_single(c.table("tags").select("*").eq("name", name))
             return Tag(**existing.data)
         except Exception:
-            # Create
-            created = exec_single(
-                c.table("tags")
-                .insert({"name": name, "created_by": str(user_id)})
-                .select("*")
+            created = exec_query(
+                c.table("tags").insert(
+                    {"name": name, "created_by": str(user_id)},
+                    returning="representation",
+                )
             )
-            return Tag(**created.data)
+            row = first_row(created.data)
+            if not row:
+                raise HTTPException(
+                    http_status.HTTP_400_BAD_REQUEST, "Create tag failed"
+                )
+            return Tag(**row)
 
     @classmethod
     async def list_tags(cls) -> List[Tag]:

@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ticketing-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./app:/app/app # For development hot reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - ticketing-network
+  # Frontend will be added later
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: ticketing-frontend
+  #   ports:
+  #     - "3000:3000"
+  #   networks:
+  #     - ticketing-network
+
+networks:
+  ticketing-network:
+    driver: bridge

@@ -1,8 +1,10 @@
+# app/db/database.py
 from supabase import create_client, Client
 from typing import Optional
 import logging
 import contextvars
 
+from fastapi import HTTPException, status
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -50,3 +52,33 @@ def bind_request_client(access_token: str) -> None:
     Store a request-scoped client in the context var. Call this early per request.
     """
     _request_client.set(client_for_token(access_token))
+
+
+# ---------- NEW: safe execute helpers for supabase-py v2 ----------
+
+
+def exec_query(q):
+    """
+    Execute a PostgREST query and return the APIResponse.
+    Errors are raised as HTTP 400 (unless the SDK throws a specific type).
+    """
+    try:
+        return q.execute()
+    except Exception as e:
+        # supabase-py v2 raises exceptions for non-2xx responses
+        msg = str(e)
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, msg)
+
+
+def exec_single(q, not_found_msg: str = "Not found"):
+    """
+    Execute a .single() query. If no rows, map to HTTP 404.
+    """
+    try:
+        return q.single().execute()
+    except Exception as e:
+        msg = str(e)
+        # PostgREST "no rows" commonly shows as "Results contain 0 rows"
+        if "0 rows" in msg or "no rows" in msg.lower():
+            raise HTTPException(status.HTTP_404_NOT_FOUND, not_found_msg)
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, msg)

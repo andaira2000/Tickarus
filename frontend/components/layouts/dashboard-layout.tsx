@@ -64,6 +64,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const { user, isAuthenticated, isInitialized, logout } = useAuthStore();
 
+  // More precise path matching function
+  const isPathActive = (href: string) => {
+    if (pathname === href) return true;
+    
+    // Special handling for tickets routes
+    if (href === '/tickets' && pathname === '/tickets/my') return false;
+    if (href === '/tickets/my' && pathname === '/tickets') return false;
+    
+    // General sub-path matching (but not for tickets)
+    if (href !== '/tickets' && pathname.startsWith(href + '/')) return true;
+    
+    return false;
+  };
+
   useEffect(() => {
     if (isInitialized && !isAuthenticated) {
       router.push('/login');
@@ -119,7 +133,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       <Link
                         href={item.href}
                         className={cn(
-                          pathname === item.href || pathname.startsWith(item.href + '/')
+                          isPathActive(item.href)
                             ? 'bg-gray-100 text-blue-600'
                             : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50',
                           'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
@@ -127,7 +141,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                       >
                         <item.icon
                           className={cn(
-                            pathname === item.href || pathname.startsWith(item.href + '/')
+                            isPathActive(item.href)
                               ? 'text-blue-600'
                               : 'text-gray-400 group-hover:text-blue-600',
                             'h-6 w-6 shrink-0'

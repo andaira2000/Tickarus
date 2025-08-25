@@ -1,0 +1,98 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { User } from '../types';
+import { apiClient } from '../api';
+
+interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  isInitialized: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, fullName?: string) => Promise<void>;
+  logout: () => void;
+  initializeAuth: () => void;
+}
+
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      isInitialized: false,
+
+      login: async (email: string, password: string) => {
+        set({ isLoading: true });
+        try {
+          await apiClient.login(email, password);
+          
+          // Create user object from auth response
+          const user: User = {
+            id: '', // We don't get user ID from login, will be filled by profile endpoint later
+            email: email,
+          };
+          
+          set({
+            user,
+            isAuthenticated: true,
+            isLoading: false,
+            isInitialized: true,
+          });
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      register: async (email: string, password: string, fullName?: string) => {
+        set({ isLoading: true });
+        try {
+          const response = await apiClient.register(email, password, fullName);
+          
+          const user: User = {
+            id: response.user_id,
+            email: response.email,
+            full_name: fullName,
+          };
+          
+          set({
+            user,
+            isAuthenticated: false, // User needs to confirm email
+            isLoading: false,
+          });
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      logout: () => {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        set({
+          user: null,
+          isAuthenticated: false,
+          isInitialized: true,
+        });
+      },
+
+      initializeAuth: () => {
+        const token = localStorage.getItem('access_token');
+        if (token) {
+          // In a real app, you'd verify the token with the server
+          set({ isAuthenticated: true, isInitialized: true });
+        } else {
+          set({ isAuthenticated: false, isInitialized: true });
+        }
+      },
+    }),
+    {
+      name: 'auth-storage',
+      partialize: (state) => ({ 
+        user: state.user, 
+        isAuthenticated: state.isAuthenticated 
+      }),
+    }
+  )
+);

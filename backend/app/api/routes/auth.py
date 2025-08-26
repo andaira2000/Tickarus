@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from app.db.database import init_supabase
+from app.api.dependencies import get_current_user
 
 router = APIRouter()
 
@@ -64,3 +65,24 @@ def login(creds: UserLogin):
         }
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+
+@router.get("/me")
+async def get_current_user_profile(current_user=Depends(get_current_user)):
+    """
+    Get current user's profile information from JWT token.
+    """
+    try:
+        return {
+            "id": current_user.id,
+            "email": current_user.email,
+            "full_name": current_user.user_metadata.get("full_name") if current_user.user_metadata else None,
+            "email_confirmed_at": current_user.email_confirmed_at,
+            "created_at": current_user.created_at,
+            "updated_at": current_user.updated_at,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get user profile: {str(e)}"
+        )

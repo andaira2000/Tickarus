@@ -12,45 +12,41 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { apiClient } from '@/lib/api';
-import { TicketFilters, TicketPriority, TicketStatus, TicketList } from '@/lib/types';
+import { TicketPriority, TicketStatus, TicketList } from '@/lib/types';
 import { useAuthStore } from '@/lib/store/auth';
 
 function MyTicketsContent() {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('created');
 
-  const createdFilters: TicketFilters = {
-    created_by: user?.id,
-    page: 1,
-    page_size: 20,
-  };
-
-  const assignedFilters: TicketFilters = {
-    assignee_id: user?.id,
-    page: 1,
-    page_size: 20,
-  };
-
-  // For commented tickets, we'd need a different approach since the API doesn't directly support this
-  const commentedFilters: TicketFilters = {
-    commented_by: user?.id,
-    page: 1,
-    page_size: 20,
-  };
-
   const { data: createdTickets, isLoading: isLoadingCreated } = useQuery({
-    queryKey: ['tickets', 'created', createdFilters],
-    queryFn: () => apiClient.getTickets(createdFilters),
+    queryKey: ['tickets', 'created', user?.id],
+    queryFn: () => apiClient.getTickets({
+      created_by: user!.id,
+      page: 1,
+      page_size: 20,
+    }),
+    enabled: !!user?.id,
   });
 
   const { data: assignedTickets, isLoading: isLoadingAssigned } = useQuery({
-    queryKey: ['tickets', 'assigned', assignedFilters],
-    queryFn: () => apiClient.getTickets(assignedFilters),
+    queryKey: ['tickets', 'assigned', user?.id],
+    queryFn: () => apiClient.getTickets({
+      assignee_id: user!.id,
+      page: 1,
+      page_size: 20,
+    }),
+    enabled: !!user?.id,
   });
 
   const { data: commentedTickets, isLoading: isLoadingCommented } = useQuery({
-    queryKey: ['tickets', 'commented', commentedFilters],
-    queryFn: () => apiClient.getTickets(commentedFilters),
+    queryKey: ['tickets', 'commented', user?.id],
+    queryFn: () => apiClient.getTickets({
+      commented_by: user!.id,
+      page: 1,
+      page_size: 20,
+    }),
+    enabled: !!user?.id,
   });
 
   const getPriorityColor = (priority: TicketPriority) => {

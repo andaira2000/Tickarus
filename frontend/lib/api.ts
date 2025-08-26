@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { 
   AuthResponse, 
+  User,
   Team, 
   TeamMember, 
   Ticket, 
@@ -67,6 +68,11 @@ class ApiClient {
     localStorage.setItem('access_token', response.data.access_token);
     localStorage.setItem('refresh_token', response.data.refresh_token);
     
+    return response.data;
+  }
+
+  async getCurrentUser() {
+    const response = await this.client.get<User>('/api/auth/me');
     return response.data;
   }
 

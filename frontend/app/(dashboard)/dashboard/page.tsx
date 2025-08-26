@@ -8,20 +8,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { apiClient } from '@/lib/api';
 import { TicketPriority, TicketStatus } from '@/lib/types';
+import { useAuthStore } from '@/lib/store/auth';
 
 function DashboardContent() {
+  const { user } = useAuthStore();
+  
   const { data: tickets } = useQuery({
     queryKey: ['tickets', { page: 1, page_size: 5 }],
     queryFn: () => apiClient.getTickets({ page: 1, page_size: 5 }),
   });
 
   const { data: myTickets } = useQuery({
-    queryKey: ['my-tickets'],
+    queryKey: ['my-tickets', user?.id],
     queryFn: () => apiClient.getTickets({ 
-      created_by: 'current-user', // You'll need to get actual user ID
+      created_by: user!.id,
       page: 1, 
       page_size: 5 
     }),
+    enabled: !!user?.id,
   });
 
   const { data: teams } = useQuery({

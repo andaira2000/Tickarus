@@ -11,7 +11,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName?: string) => Promise<void>;
   logout: () => void;
-  initializeAuth: () => void;
+  initializeAuth: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -27,11 +27,8 @@ export const useAuthStore = create<AuthState>()(
         try {
           await apiClient.login(email, password);
           
-          // Create user object from auth response
-          const user: User = {
-            id: '', // We don't get user ID from login, will be filled by profile endpoint later
-            email: email,
-          };
+          // Get user profile
+          const user = await apiClient.getCurrentUser();
           
           set({
             user,
@@ -77,11 +74,27 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
-      initializeAuth: () => {
+      initializeAuth: async () => {
         const token = localStorage.getItem('access_token');
         if (token) {
-          // In a real app, you'd verify the token with the server
-          set({ isAuthenticated: true, isInitialized: true });
+          try {
+            // Verify the token and get user data
+            const user = await apiClient.getCurrentUser();
+            set({ 
+              user, 
+              isAuthenticated: true, 
+              isInitialized: true 
+            });
+          } catch {
+            // Token is invalid
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            set({ 
+              user: null, 
+              isAuthenticated: false, 
+              isInitialized: true 
+            });
+          }
         } else {
           set({ isAuthenticated: false, isInitialized: true });
         }

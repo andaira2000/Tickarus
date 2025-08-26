@@ -18,7 +18,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
 
   useEffect(() => {
-    initializeAuth();
+    initializeAuth().catch(console.error);
   }, [initializeAuth]);
 
   return (

@@ -19,7 +19,16 @@ router = APIRouter()
 async def create_ticket(
     ticket: TicketCreate, current_user_id: UUID = Depends(get_current_user_id)
 ):
-    return await TicketService.create_ticket(ticket)
+    # Get the actor ID for the current user
+    from app.services.actor_service import ActorService
+    user_actor = await ActorService.get_actor_for_user(current_user_id)
+    if not user_actor:
+        raise HTTPException(
+            http_status.HTTP_400_BAD_REQUEST, 
+            "User actor not found"
+        )
+    
+    return await TicketService.create_ticket(ticket, user_actor.id)
 
 
 @router.get("/", response_model=TicketList)
@@ -30,14 +39,22 @@ async def list_tickets(
     status: Optional[TicketStatus] = None,
     priority: Optional[TicketPriority] = None,
     assignee_id: Optional[UUID] = None,
-    created_by: Optional[UUID] = None,
     tags: Optional[List[str]] = Query(
         None, description="Filter by tag names (any match)"
     ),
     commented_by: Optional[UUID] = None,
     q: Optional[str] = Query(None, description="Keyword search"),
+    created_by_me: Optional[bool] = None,
     current_user_id: UUID = Depends(get_current_user_id),
 ):
+    # Get current user's actor ID if needed for created_by_me filter
+    current_user_actor_id = None
+    if created_by_me:
+        from app.services.actor_service import ActorService
+        user_actor = await ActorService.get_actor_for_user(current_user_id)
+        if user_actor:
+            current_user_actor_id = user_actor.id
+    
     result = await TicketService.list_tickets(
         page=page,
         page_size=page_size,
@@ -45,10 +62,11 @@ async def list_tickets(
         status_filter=status,
         priority=priority,
         assignee_id=assignee_id,
-        created_by=created_by,
         tag_names=tags,
         commented_by=commented_by,
         search_query=q,
+        created_by_me=created_by_me,
+        current_user_actor_id=current_user_actor_id,
     )
     return TicketList(**result)
 

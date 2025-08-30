@@ -7,7 +7,9 @@ from app.models import BaseDBModel
 class Tag(BaseDBModel):
     name: str = Field(..., min_length=1, max_length=64)
     is_standard: bool = False
-    created_by: Optional[UUID] = None
+    creator_actor_id: Optional[UUID] = None  # Reference to actors table (replaces created_by)
+    # actor info for display
+    creator_info: Optional[dict] = None  # Will be populated with ActorInfo data
 
 
 class TagCreate(BaseModel):

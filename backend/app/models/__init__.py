@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class BaseDBModel(BaseModel):
-    id: Optional[UUID] = None
+    id: UUID
     created_at: Optional[datetime] = None
 
     # Pydantic v2-style config with proper typing

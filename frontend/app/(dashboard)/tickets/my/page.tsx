@@ -23,7 +23,7 @@ function MyTicketsContent() {
   const { data: createdTickets, isLoading: isLoadingCreated } = useQuery({
     queryKey: ['tickets', 'created', user?.id],
     queryFn: () => apiClient.getTickets({
-      created_by: user!.id,
+      created_by_me: true,
       page: 1,
       page_size: 20,
     }),

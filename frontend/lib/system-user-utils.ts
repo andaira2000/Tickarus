@@ -1,20 +1,28 @@
-import { Ticket, SystemUserType } from './types';
+import { Ticket, SystemUserType, ActorInfo } from './types';
 
 export function getTicketCreatorInfo(ticket: Ticket) {
-  const isSystemCreated = !ticket.created_by && ticket.created_by_system_user_id;
-  const isUserCreated = ticket.created_by && !ticket.created_by_system_user_id;
+  const creatorInfo = ticket.creator_info;
+  
+  if (!creatorInfo) {
+    return {
+      isSystemCreated: false,
+      isUserCreated: false,
+      creator: null
+    };
+  }
+  
+  const isSystemCreated = creatorInfo.actor_type === 'system';
+  const isUserCreated = creatorInfo.actor_type === 'human';
   
   return {
     isSystemCreated,
     isUserCreated,
-    creator: isSystemCreated 
-      ? ticket.created_by_system_user 
-      : { id: ticket.created_by, type: 'user' as const }
+    creator: creatorInfo
   };
 }
 
-export function getSystemUserDisplayName(systemUser: { name: string; type: SystemUserType }): string {
-  return systemUser.name;
+export function getActorDisplayName(actor: ActorInfo): string {
+  return actor.display_name;
 }
 
 export function getSystemUserIcon(systemUserType: SystemUserType): string {

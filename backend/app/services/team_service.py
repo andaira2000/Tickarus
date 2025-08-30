@@ -11,14 +11,14 @@ class TeamService:
         return get_supabase()
 
     @classmethod
-    async def create_team(cls, payload: TeamCreate, creator_id: UUID) -> Team:
+    async def create_team(cls, payload: TeamCreate, creator_user_id: UUID) -> Team:
         c = cls._c()
         resp = exec_query(
             c.table("teams").insert(
                 {
                     "name": payload.name,
                     "description": payload.description,
-                    "created_by": str(creator_id),
+                    "created_by": str(creator_user_id),
                 },
                 returning="representation",
             )

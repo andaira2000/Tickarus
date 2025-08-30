@@ -21,7 +21,7 @@ function DashboardContent() {
   const { data: myTickets } = useQuery({
     queryKey: ['my-tickets', user?.id],
     queryFn: () => apiClient.getTickets({ 
-      created_by: user!.id,
+      created_by_me: true,
       page: 1, 
       page_size: 5 
     }),

@@ -12,13 +12,13 @@ class CommentService:
         return get_supabase()
 
     @classmethod
-    async def create_comment(cls, payload: CommentCreate, user_id: UUID) -> Comment:
+    async def create_comment(cls, payload: CommentCreate, actor_id: UUID) -> Comment:
         c = cls._c()
         resp = exec_query(
             c.table("comments").insert(
                 {
                     "ticket_id": str(payload.ticket_id),
-                    "user_id": str(user_id),
+                    "actor_id": str(actor_id),
                     "content": payload.content,
                 },
                 returning="representation",
@@ -36,15 +36,44 @@ class CommentService:
         c = cls._c()
         resp = exec_query(
             c.table("comments")
-            .select("*")
+            .select("""
+                *,
+                actors:actor_id(
+                    id,
+                    actor_type,
+                    profiles:profile_id(id, full_name, username, avatar_url),
+                    system_users:system_user_id(id, name, type, description)
+                )
+            """)
             .eq("ticket_id", str(ticket_id))
             .order("created_at", desc=False)
         )
-        return [Comment(**r) for r in (resp.data or [])]
+        
+        # Hydrate with actor info
+        comments = []
+        for comment_data in (resp.data or []):
+            if comment_data.get("actors"):
+                actor = comment_data["actors"]
+                if actor["actor_type"] == "human" and actor.get("profiles"):
+                    from ..models.actor import ActorInfo
+                    comment_data["author_info"] = ActorInfo.from_human_profile(
+                        UUID(actor["id"]), actor["profiles"]
+                    ).dict()
+                elif actor["actor_type"] == "system" and actor.get("system_users"):
+                    from ..models.actor import ActorInfo
+                    comment_data["author_info"] = ActorInfo.from_system_user(
+                        UUID(actor["id"]), actor["system_users"]
+                    ).dict()
+            
+            # Remove nested actors data
+            comment_data.pop("actors", None)
+            comments.append(Comment(**comment_data))
+            
+        return comments
 
     @classmethod
     async def update_comment(
-        cls, comment_id: UUID, patch: CommentUpdate, user_id: UUID
+        cls, comment_id: UUID, patch: CommentUpdate, actor_id: UUID
     ) -> Comment:
         c = cls._c()
         resp = exec_query(
@@ -67,6 +96,6 @@ class CommentService:
         return Comment(**row)
 
     @classmethod
-    async def delete_comment(cls, comment_id: UUID, user_id: UUID) -> None:
+    async def delete_comment(cls, comment_id: UUID, actor_id: UUID) -> None:
         c = cls._c()
         exec_query(c.table("comments").delete().eq("id", str(comment_id)))

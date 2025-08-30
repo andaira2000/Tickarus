@@ -46,14 +46,15 @@ class TicketUpdate(BaseModel):
 
 
 class Ticket(TicketBase, BaseDBModel):
-    created_by: Optional[UUID] = None  # Nullable for system-generated tickets
-    created_by_system_user_id: Optional[UUID] = None  # Reference to system_users table
+    actor_id: UUID  # Reference to actors table (replaces created_by and created_by_system_user_id)
     updated_at: Optional[datetime] = None
     last_activity_at: Optional[datetime] = None
     # optional expansions
     tags: Optional[List[str]] = []
     comments_count: Optional[int] = 0
     team_name: Optional[str] = None
+    # actor info for display
+    creator_info: Optional[dict] = None  # Will be populated with ActorInfo data
 
 
 class TicketList(BaseModel):

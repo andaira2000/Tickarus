@@ -17,8 +17,11 @@ class TicketService:
         return get_supabase()
 
     @classmethod
-    async def create_ticket(cls, data: TicketCreate, client=None, created_by_user_id=None, created_by_system_user_id=None) -> Ticket:
+    async def create_ticket(
+        cls, data: TicketCreate, actor_id: UUID, client=None
+    ) -> Ticket:
         c = client or cls._c()
+
         payload = {
             "team_id": str(data.team_id),
             "title": data.title,
@@ -36,8 +39,7 @@ class TicketService:
             )
             or "medium",
             "assignee_id": str(data.assignee_id) if data.assignee_id else None,
-            "created_by": str(created_by_user_id) if created_by_user_id else None,
-            "created_by_system_user_id": str(created_by_system_user_id) if created_by_system_user_id else None,
+            "actor_id": str(actor_id),
         }
         resp = exec_query(
             c.table("tickets").insert(payload, returning="representation")
@@ -113,10 +115,11 @@ class TicketService:
         status_filter: Optional[TicketStatus] = None,
         priority: Optional[TicketPriority] = None,
         assignee_id: Optional[UUID] = None,
-        created_by: Optional[UUID] = None,
         tag_names: Optional[List[str]] = None,
         commented_by: Optional[UUID] = None,
         search_query: Optional[str] = None,
+        created_by_me: Optional[bool] = None,
+        current_user_actor_id: Optional[UUID] = None,
     ):
         c = cls._c()
         q = c.table("tickets").select("*", count="exact")
@@ -138,8 +141,8 @@ class TicketService:
             )
         if assignee_id:
             q = q.eq("assignee_id", str(assignee_id))
-        if created_by:
-            q = q.eq("created_by", str(created_by))
+        if created_by_me and current_user_actor_id:
+            q = q.eq("actor_id", str(current_user_actor_id))
 
         if tag_names:
             tags_resp = exec_query(
@@ -164,8 +167,15 @@ class TicketService:
                 return {"tickets": [], "total": 0, "page": page, "page_size": page_size}
 
         if commented_by:
+            # Need to find tickets where this user (via their actor) has commented
+            # First get the user's actor ID
+            from ..services.actor_service import ActorService
+            user_actor = await ActorService.get_actor_for_user(commented_by)
+            if not user_actor:
+                return {"tickets": [], "total": 0, "page": page, "page_size": page_size}
+            
             cm_resp = exec_query(
-                c.table("comments").select("ticket_id").eq("user_id", str(commented_by))
+                c.table("comments").select("ticket_id").eq("actor_id", str(user_actor.id))
             )
             tids = list({row["ticket_id"] for row in (cm_resp.data or [])})
             if not tids:
@@ -269,8 +279,30 @@ class TicketService:
         comments_count = getattr(cc, "count", None) or 0
         team = exec_single(c.table("teams").select("name").eq("id", row["team_id"]))
         team_name = team.data["name"]
+
+        # Get creator info from actors
+        creator_info = None
+        if row.get("actor_id"):
+            actor_resp = exec_single(
+                c.table("actors")
+                .select("*, profiles(full_name, username, avatar_url), system_users(name, type)")
+                .eq("id", row["actor_id"])
+            )
+            actor_data = actor_resp.data
+            if actor_data["actor_type"] == "human" and actor_data.get("profiles"):
+                from ..models.actor import ActorInfo
+                creator_info = ActorInfo.from_human_profile(
+                    UUID(actor_data["id"]), actor_data["profiles"]
+                ).dict()
+            elif actor_data["actor_type"] == "system" and actor_data.get("system_users"):
+                from ..models.actor import ActorInfo
+                creator_info = ActorInfo.from_system_user(
+                    UUID(actor_data["id"]), actor_data["system_users"]
+                ).dict()
+
         row = dict(row)
         row["tags"] = tags
         row["comments_count"] = comments_count
         row["team_name"] = team_name
+        row["creator_info"] = creator_info
         return Ticket(**row)

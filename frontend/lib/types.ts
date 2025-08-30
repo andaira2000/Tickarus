@@ -21,6 +21,17 @@ export type SystemUserType =
   | 'data_processor' 
   | 'notification_service';
 
+export type ActorType = 'human' | 'system';
+
+export interface ActorInfo {
+  id: string;
+  actor_type: ActorType;
+  display_name: string;
+  avatar_url?: string;
+  is_system: boolean;
+  system_user_type?: SystemUserType; // Only for system actors
+}
+
 export interface AuthResponse {
   access_token: string;
   refresh_token: string;
@@ -53,16 +64,15 @@ export interface Ticket {
   status: TicketStatus;
   priority: TicketPriority;
   assignee_id?: string;
-  created_by?: string; // nullable for system-generated tickets
-  created_by_system_user_id?: string;
+  actor_id: string; // Reference to actors table
   created_at: string;
   updated_at?: string;
   last_activity_at?: string;
   tags?: string[];
   comments_count?: number;
   team_name?: string;
-  // populated by hydration
-  created_by_system_user?: SystemUser;
+  // populated by hydration - creator info from actor
+  creator_info?: ActorInfo;
 }
 
 export interface TicketCreate {
@@ -94,9 +104,11 @@ export interface Comment {
   id: string;
   ticket_id: string;
   content: string;
-  created_by: string;
+  actor_id: string; // Reference to actors table
   created_at: string;
   updated_at?: string;
+  // populated by hydration - author info from actor
+  author_info?: ActorInfo;
 }
 
 export interface Tag {
@@ -125,10 +137,11 @@ export interface TicketFilters {
   status?: TicketStatus;
   priority?: TicketPriority;
   assignee_id?: string;
-  created_by?: string;
   tags?: string[];
   commented_by?: string;
   q?: string;
   page?: number;
   page_size?: number;
+  // For backend filtering - will be populated by backend based on current user
+  created_by_me?: boolean;
 }

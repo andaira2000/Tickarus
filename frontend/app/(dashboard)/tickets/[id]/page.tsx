@@ -226,7 +226,7 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
                   <div key={comment.id} className="border-l-2 border-gray-200 pl-4">
                     <div className="flex items-center space-x-2 mb-1">
                       <span className="font-medium text-gray-900">
-                        User {comment.created_by}
+                        {comment.author_info ? comment.author_info.display_name : 'Unknown User'}
                       </span>
                       <span className="text-sm text-gray-500">
                         {new Date(comment.created_at).toLocaleDateString()}

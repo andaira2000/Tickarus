@@ -11,7 +11,7 @@ class TagService:
         return get_supabase()
 
     @classmethod
-    async def create_tag(cls, tag_data: TagCreate, user_id: UUID) -> Tag:
+    async def create_tag(cls, tag_data: TagCreate, actor_id: UUID) -> Tag:
         c = cls._c()
         name = tag_data.name.lower()
         try:
@@ -20,7 +20,7 @@ class TagService:
         except Exception:
             created = exec_query(
                 c.table("tags").insert(
-                    {"name": name, "created_by": str(user_id)},
+                    {"name": name, "creator_actor_id": str(actor_id)},
                     returning="representation",
                 )
             )

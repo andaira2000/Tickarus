@@ -19,6 +19,8 @@ class CommentUpdate(BaseModel):
 
 
 class Comment(BaseDBModel, CommentBase):
-    user_id: UUID
+    actor_id: UUID  # Reference to actors table (replaces user_id)
     is_ai: bool = False
     updated_at: Optional[datetime] = None
+    # actor info for display
+    author_info: Optional[dict] = None  # Will be populated with ActorInfo data

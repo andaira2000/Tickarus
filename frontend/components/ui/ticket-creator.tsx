@@ -3,8 +3,8 @@ import { Badge } from './badge';
 import { Avatar, AvatarFallback } from './avatar';
 import { Ticket } from '@/lib/types';
 import { 
-  getTicketCreatorInfo, 
-  getSystemUserDisplayName, 
+  getTicketCreatorInfo,
+  getActorDisplayName,
   getSystemUserIcon, 
   getSystemUserTypeLabel,
   getSystemUserColor 
@@ -19,12 +19,28 @@ interface TicketCreatorProps {
 export function TicketCreator({ ticket, showAvatar = true, showTypeLabel = false }: TicketCreatorProps) {
   const creatorInfo = getTicketCreatorInfo(ticket);
 
-  if (creatorInfo.isSystemCreated && ticket.created_by_system_user) {
-    const systemUser = ticket.created_by_system_user;
-    const displayName = getSystemUserDisplayName(systemUser);
-    const icon = getSystemUserIcon(systemUser.type);
-    const typeLabel = getSystemUserTypeLabel(systemUser.type);
-    const colorClass = getSystemUserColor(systemUser.type);
+  if (!creatorInfo.creator) {
+    return (
+      <div className="flex items-center space-x-2">
+        {showAvatar && (
+          <Avatar className="h-6 w-6">
+            <AvatarFallback className="text-xs">
+              ?
+            </AvatarFallback>
+          </Avatar>
+        )}
+        <span className="text-sm text-gray-400">Unknown</span>
+      </div>
+    );
+  }
+
+  const actor = creatorInfo.creator;
+  const displayName = getActorDisplayName(actor);
+
+  if (creatorInfo.isSystemCreated && actor.system_user_type) {
+    const icon = getSystemUserIcon(actor.system_user_type);
+    const typeLabel = getSystemUserTypeLabel(actor.system_user_type);
+    const colorClass = getSystemUserColor(actor.system_user_type);
 
     return (
       <div className="flex items-center space-x-2">
@@ -50,18 +66,16 @@ export function TicketCreator({ ticket, showAvatar = true, showTypeLabel = false
   }
 
   if (creatorInfo.isUserCreated) {
-    // For now, we'll just show the user ID since we don't have user lookup
-    // In a real implementation, you'd fetch user details
     return (
       <div className="flex items-center space-x-2">
         {showAvatar && (
           <Avatar className="h-6 w-6">
             <AvatarFallback className="text-xs">
-              U
+              {displayName.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
         )}
-        <span className="text-sm text-gray-600">User</span>
+        <span className="text-sm text-gray-600">{displayName}</span>
       </div>
     );
   }
@@ -83,10 +97,19 @@ export function TicketCreator({ ticket, showAvatar = true, showTypeLabel = false
 export function TicketCreatorBadge({ ticket }: { ticket: Ticket }) {
   const creatorInfo = getTicketCreatorInfo(ticket);
 
-  if (creatorInfo.isSystemCreated && ticket.created_by_system_user) {
-    const systemUser = ticket.created_by_system_user;
-    const icon = getSystemUserIcon(systemUser.type);
-    const typeLabel = getSystemUserTypeLabel(systemUser.type);
+  if (!creatorInfo.creator) {
+    return (
+      <Badge variant="outline" className="text-xs text-gray-400">
+        Unknown Creator
+      </Badge>
+    );
+  }
+
+  const actor = creatorInfo.creator;
+
+  if (creatorInfo.isSystemCreated && actor.system_user_type) {
+    const icon = getSystemUserIcon(actor.system_user_type);
+    const typeLabel = getSystemUserTypeLabel(actor.system_user_type);
 
     return (
       <Badge variant="secondary" className="text-xs">

@@ -371,8 +371,17 @@ class GitHubService:
 
         # Create ticket through ticket service using service client and CI bot
         CI_BOT_UUID = "00000000-0000-4000-8000-000000000001"  # CI Automation Bot
+        # Get CI bot actor ID
+        from ..services.actor_service import ActorService
+
+        ci_bot_actor = await ActorService.get_actor_for_system_user(UUID(CI_BOT_UUID), client=supabase)
+
+        if not ci_bot_actor:
+            logger.error("CI Bot actor not found")
+            return None
+
         ticket = await self.ticket_service.create_ticket(
-            ticket_data, client=supabase, created_by_system_user_id=CI_BOT_UUID
+            ticket_data, ci_bot_actor.id, client=supabase
         )
 
         # Link CI failure to ticket
@@ -424,7 +433,7 @@ class GitHubService:
                 description += f"- `{commit['sha'][:8]}` {commit['message'][:100]}...\n"
 
         if ci_failure.logs:
-            description += f"\n### Build Logs\n```\n{ci_failure.logs[:1000]}...\n```\n"
+            description += f"\n### Build Logs\n```\n{ci_failure.logs}\n```\n"
 
         if workflow_run and isinstance(workflow_run, dict):
             description += (

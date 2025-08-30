@@ -5,6 +5,22 @@ export interface User {
   full_name?: string;
 }
 
+export interface SystemUser {
+  id: string;
+  name: string;
+  type: SystemUserType;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export type SystemUserType = 
+  | 'ci_automation' 
+  | 'ai_assistant' 
+  | 'data_processor' 
+  | 'notification_service';
+
 export interface AuthResponse {
   access_token: string;
   refresh_token: string;
@@ -37,13 +53,16 @@ export interface Ticket {
   status: TicketStatus;
   priority: TicketPriority;
   assignee_id?: string;
-  created_by: string;
+  created_by?: string; // nullable for system-generated tickets
+  created_by_system_user_id?: string;
   created_at: string;
   updated_at?: string;
   last_activity_at?: string;
   tags?: string[];
   comments_count?: number;
   team_name?: string;
+  // populated by hydration
+  created_by_system_user?: SystemUser;
 }
 
 export interface TicketCreate {

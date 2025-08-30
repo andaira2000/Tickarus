@@ -2,6 +2,7 @@ import axios from 'axios';
 import { 
   AuthResponse, 
   User,
+  SystemUser,
   Team, 
   TeamMember, 
   Ticket, 
@@ -200,6 +201,17 @@ class ApiClient {
 
   async getPopularTags(limit = 10) {
     const response = await this.client.get<{ name: string; count: number }[]>(`/api/tags/popular?limit=${limit}`);
+    return response.data;
+  }
+
+  // System Users endpoints
+  async getSystemUsers() {
+    const response = await this.client.get<SystemUser[]>('/api/system-users');
+    return response.data;
+  }
+
+  async getSystemUser(systemUserId: string) {
+    const response = await this.client.get<SystemUser>(`/api/system-users/${systemUserId}`);
     return response.data;
   }
 }

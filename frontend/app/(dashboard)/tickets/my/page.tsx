@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { TicketCreator } from '@/components/ui/ticket-creator';
 import { apiClient } from '@/lib/api';
 import { TicketPriority, TicketStatus, TicketList } from '@/lib/types';
 import { useAuthStore } from '@/lib/store/auth';
@@ -101,6 +102,7 @@ function MyTicketsContent() {
               <TableHead>Team</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Priority</TableHead>
+              <TableHead>Creator</TableHead>
               <TableHead>Created</TableHead>
               <TableHead>Comments</TableHead>
               <TableHead></TableHead>
@@ -133,6 +135,9 @@ function MyTicketsContent() {
                   </Badge>
                 </TableCell>
                 <TableCell>
+                  <TicketCreator ticket={ticket} showAvatar={true} />
+                </TableCell>
+                <TableCell>
                   <span className="text-sm text-gray-500">
                     {new Date(ticket.created_at).toLocaleDateString()}
                   </span>
@@ -153,7 +158,7 @@ function MyTicketsContent() {
             ))}
             {(!tickets?.tickets || tickets.tickets.length === 0) && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   <div className="text-gray-500">
                     {isLoading ? 'Loading tickets...' : 'No tickets found'}
                   </div>

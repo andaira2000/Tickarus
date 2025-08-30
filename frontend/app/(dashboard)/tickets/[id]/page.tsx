@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
+import { TicketCreator, TicketCreatorBadge } from '@/components/ui/ticket-creator';
 import { apiClient } from '@/lib/api';
 import { TicketPriority, TicketStatus } from '@/lib/types';
 
@@ -176,11 +177,16 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{ticket.title}</h1>
-            <p className="mt-2 text-gray-600">
-              Created {new Date(ticket.created_at).toLocaleDateString()} • Team: {ticket.team_name}
-            </p>
+            <div className="mt-2 flex items-center space-x-4 text-gray-600">
+              <span>Created {new Date(ticket.created_at).toLocaleDateString()}</span>
+              <span>•</span>
+              <span>Team: {ticket.team_name}</span>
+              <span>•</span>
+              <TicketCreator ticket={ticket} showAvatar={true} />
+            </div>
           </div>
           <div className="flex items-center space-x-2">
+            <TicketCreatorBadge ticket={ticket} />
             <Badge variant={getStatusColor(ticket.status)}>
               {formatStatus(ticket.status)}
             </Badge>
@@ -369,7 +375,9 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
               )}
               <div>
                 <span className="text-sm font-medium text-gray-500">Created By</span>
-                <p className="text-gray-900">User {ticket.created_by}</p>
+                <div className="mt-1">
+                  <TicketCreator ticket={ticket} showAvatar={true} showTypeLabel={true} />
+                </div>
               </div>
               {ticket.assignee_id && (
                 <div>

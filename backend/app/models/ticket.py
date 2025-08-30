@@ -46,7 +46,8 @@ class TicketUpdate(BaseModel):
 
 
 class Ticket(TicketBase, BaseDBModel):
-    created_by: UUID
+    created_by: Optional[UUID] = None  # Nullable for system-generated tickets
+    created_by_system_user_id: Optional[UUID] = None  # Reference to system_users table
     updated_at: Optional[datetime] = None
     last_activity_at: Optional[datetime] = None
     # optional expansions

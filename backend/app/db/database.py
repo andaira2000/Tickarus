@@ -40,6 +40,11 @@ def bind_request_client(access_token: str) -> None:
     _request_client.set(client_for_token(access_token))
 
 
+def get_service_client() -> Client:
+    """Get Supabase client with service role key for system operations"""
+    return create_client(settings.supabase_url, settings.supabase_service_key)
+
+
 # ---------- Safe execute helpers for supabase-py v2 ----------
 
 

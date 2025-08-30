@@ -13,6 +13,17 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_key: str = ""  # anon key is fine here
     supabase_service_key: Optional[str] = None  # not required by the app
+    
+    # GitHub Integration
+    github_token: Optional[str] = None
+    github_org_name: str = "tickarus-demo-org"
+    github_webhook_secret: Optional[str] = None
+    
+    # Auth (legacy fields that may exist in .env)
+    secret_key: Optional[str] = None
+    algorithm: Optional[str] = None
+    access_token_expire_minutes: Optional[str] = None
+    backend_cors_origins: Optional[str] = None
 
     class Config:
         env_file = ".env"

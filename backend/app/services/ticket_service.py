@@ -17,8 +17,8 @@ class TicketService:
         return get_supabase()
 
     @classmethod
-    async def create_ticket(cls, data: TicketCreate) -> Ticket:
-        c = cls._c()
+    async def create_ticket(cls, data: TicketCreate, client=None, created_by_user_id=None, created_by_system_user_id=None) -> Ticket:
+        c = client or cls._c()
         payload = {
             "team_id": str(data.team_id),
             "title": data.title,
@@ -36,6 +36,8 @@ class TicketService:
             )
             or "medium",
             "assignee_id": str(data.assignee_id) if data.assignee_id else None,
+            "created_by": str(created_by_user_id) if created_by_user_id else None,
+            "created_by_system_user_id": str(created_by_system_user_id) if created_by_system_user_id else None,
         }
         resp = exec_query(
             c.table("tickets").insert(payload, returning="representation")
@@ -189,8 +191,8 @@ class TicketService:
         }
 
     @classmethod
-    async def add_tags(cls, ticket_id: UUID, tag_names: List[str]) -> None:
-        c = cls._c()
+    async def add_tags(cls, ticket_id: UUID, tag_names: List[str], client=None) -> None:
+        c = client or cls._c()
         if not tag_names:
             return
         for name in tag_names:

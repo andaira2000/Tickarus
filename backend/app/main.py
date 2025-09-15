@@ -5,7 +5,7 @@ import logging
 
 from app.config import settings
 from app.db.database import init_supabase
-from app.api.routes import auth, tickets, comments, tags, teams, github
+from app.api.routes import auth, tickets, comments, tags, teams, github, metrics, ai_chat
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -52,3 +52,5 @@ app.include_router(tickets.router, prefix="/api/tickets", tags=["tickets"])
 app.include_router(comments.router, prefix="/api/comments", tags=["comments"])
 app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
 app.include_router(github.router, prefix="/api", tags=["github"])
+app.include_router(metrics.router, prefix="/api/metrics", tags=["metrics"])
+app.include_router(ai_chat.router, prefix="/api/ai-chat", tags=["ai-chat"])

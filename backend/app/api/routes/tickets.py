@@ -123,3 +123,85 @@ async def unwatch_ticket(
 ):
     await TicketService.unwatch(ticket_id, current_user_id)
     return {"message": "Stopped watching ticket"}
+
+
+@router.get("/{ticket_id}/similar", response_model=List[Dict[str, Any]])
+async def get_similar_tickets(
+    ticket_id: UUID,
+    limit: int = Query(5, ge=1, le=20, description="Number of similar tickets to return"),
+    current_user_id: UUID = Depends(get_current_user_id)
+):
+    """Get tickets similar to the specified ticket"""
+    from app.services.similarity_service import similarity_service
+    
+    # Get the ticket details first
+    ticket = await TicketService.get_ticket(ticket_id)
+    if not ticket:
+        raise HTTPException(http_status.HTTP_404_NOT_FOUND, "Ticket not found")
+    
+    # Combine title and description for similarity search
+    ticket_text = f"{ticket.title}. {ticket.description or ''}"
+    
+    # Find similar tickets
+    similar_tickets = await similarity_service.find_similar_tickets(
+        ticket_text=ticket_text,
+        current_ticket_id=ticket_id,
+        limit=limit,
+        user_id=current_user_id
+    )
+    
+    return similar_tickets
+
+
+@router.post("/{ticket_id}/similar/click")
+async def log_similarity_click(
+    ticket_id: UUID,
+    clicked_ticket_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id)
+):
+    """Log when user clicks on a similarity suggestion"""
+    from app.services.similarity_service import similarity_service
+    
+    await similarity_service.log_similarity_click(
+        clicked_ticket_id=clicked_ticket_id,
+        original_ticket_id=ticket_id,
+        user_id=current_user_id
+    )
+    
+    return {"message": "Click logged successfully"}
+
+
+@router.post("/{ticket_id}/analyze", response_model=Dict[str, Any])
+async def analyze_ticket_root_cause(
+    ticket_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id)
+):
+    """Perform AI root cause analysis on a ticket"""
+    from app.services.rootcause_service import rootcause_service
+    
+    analysis = await rootcause_service.analyze_ticket(
+        ticket_id=ticket_id,
+        user_id=current_user_id
+    )
+    
+    return analysis
+
+
+@router.post("/{ticket_id}/analyze/feedback")
+async def submit_analysis_feedback(
+    ticket_id: UUID,
+    rating: int = Query(..., ge=1, le=5, description="Rating from 1-5"),
+    feedback_text: Optional[str] = None,
+    current_user_id: UUID = Depends(get_current_user_id)
+):
+    """Submit feedback on root cause analysis quality"""
+    from app.services.rootcause_service import rootcause_service
+    
+    await rootcause_service.submit_feedback(
+        ticket_id=ticket_id,
+        user_id=current_user_id,
+        rating=rating,
+        feedback_text=feedback_text
+    )
+    
+    return {"message": "Feedback submitted successfully"}

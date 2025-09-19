@@ -44,11 +44,12 @@ class SimilarityService:
         return embedding
     
     async def find_similar_tickets(
-        self, 
-        ticket_text: str, 
+        self,
+        ticket_text: str,
         current_ticket_id: Optional[UUID] = None,
         limit: int = 5,
-        user_id: Optional[UUID] = None
+        user_id: Optional[UUID] = None,
+        client=None
     ) -> List[Dict[str, Any]]:
         """
         Find similar tickets using semantic similarity
@@ -66,7 +67,7 @@ class SimilarityService:
         
         try:
             # Get all existing tickets for comparison
-            c = self._c()
+            c = client or self._c()
             query = c.table("tickets").select("id, title, description, status, created_at, teams(name)")
             
             # Exclude current ticket if provided
@@ -134,7 +135,8 @@ class SimilarityService:
                     "similarity_scores": [r["similarity_score"] for r in results],
                     "query_length": len(ticket_text)
                 },
-                response_time_ms=response_time
+                response_time_ms=response_time,
+                client=c
             )
             
             return results

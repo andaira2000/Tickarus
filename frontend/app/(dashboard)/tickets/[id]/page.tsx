@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
 import { TicketCreator, TicketCreatorBadge } from '@/components/ui/ticket-creator';
+import { AIChat } from '@/components/ui/ai-chat';
 import { apiClient } from '@/lib/api';
 import { TicketPriority, TicketStatus } from '@/lib/types';
 
@@ -387,6 +388,9 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
               )}
             </CardContent>
           </Card>
+
+          {/* AI Chat */}
+          <AIChat ticketId={ticketId} />
         </div>
       </div>
     </>

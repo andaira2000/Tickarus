@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: ticketing-backend:latest
     container_name: ticketing-backend
     ports:
       - "8000:8000"

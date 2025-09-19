@@ -4,3 +4,10 @@ venv
 __pycache__
 node_modules
 .next
+
+Final Project Proposal (2).pdf
+backend/.claude/
+backend/CLAUDE.md
+backend/migrations/
+frontend/.claude/
+frontend/CLAUDE.md

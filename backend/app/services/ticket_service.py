@@ -49,7 +49,23 @@ class TicketService:
             raise HTTPException(
                 http_status.HTTP_400_BAD_REQUEST, "Create ticket failed"
             )
-        return await cls._hydrate_ticket(row)
+
+        ticket = await cls._hydrate_ticket(row, client=c)
+
+        # Trigger AI automation for CI-created tickets (fire and forget)
+        try:
+            from app.services.ai_automation_service import AIAutomationService
+            import asyncio
+            asyncio.create_task(
+                AIAutomationService.handle_ticket_created(ticket.id, actor_id)
+            )
+        except Exception as e:
+            # Don't fail ticket creation if AI automation fails
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"AI automation failed for ticket {ticket.id}: {str(e)}")
+
+        return ticket
 
     @classmethod
     async def get_ticket(cls, ticket_id: UUID) -> Ticket:
@@ -58,7 +74,7 @@ class TicketService:
             c.table("tickets").select("*").eq("id", str(ticket_id)),
             not_found_msg="Ticket not found",
         )
-        return await cls._hydrate_ticket(resp.data)
+        return await cls._hydrate_ticket(resp.data, client=c)
 
     @classmethod
     async def update_ticket(cls, ticket_id: UUID, patch: TicketUpdate) -> Ticket:
@@ -104,7 +120,7 @@ class TicketService:
             raise HTTPException(
                 http_status.HTTP_400_BAD_REQUEST, "Update ticket failed"
             )
-        return await cls._hydrate_ticket(row)
+        return await cls._hydrate_ticket(row, client=c)
 
     @classmethod
     async def list_tickets(
@@ -191,7 +207,7 @@ class TicketService:
 
         resp = exec_query(q)
         data = resp.data or []
-        hydrated = [await cls._hydrate_ticket(row) for row in data]
+        hydrated = [await cls._hydrate_ticket(row, client=c) for row in data]
         total = getattr(resp, "count", None) or 0
         return {
             "tickets": hydrated,
@@ -266,8 +282,8 @@ class TicketService:
         )
 
     @classmethod
-    async def _hydrate_ticket(cls, row: Dict[str, Any]) -> Ticket:
-        c = cls._c()
+    async def _hydrate_ticket(cls, row: Dict[str, Any], client=None) -> Ticket:
+        c = client or cls._c()
         tid = row["id"]
         ttags = exec_query(
             c.table("ticket_tags").select("tags(name)").eq("ticket_id", tid)

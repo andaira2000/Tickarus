@@ -205,3 +205,39 @@ async def submit_analysis_feedback(
     )
     
     return {"message": "Feedback submitted successfully"}
+
+
+@router.post("/{ticket_id}/auto-tag", response_model=Dict[str, Any])
+async def analyze_ticket_for_tagging(
+    ticket_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id)
+):
+    """Analyze ticket for automatic tagging and prioritization suggestions"""
+    from app.services.auto_tagging_service import auto_tagging_service
+
+    analysis = await auto_tagging_service.analyze_ticket(
+        ticket_id=ticket_id,
+        user_id=current_user_id
+    )
+
+    return analysis
+
+
+@router.post("/{ticket_id}/apply-suggestions")
+async def apply_auto_tagging_suggestions(
+    ticket_id: UUID,
+    apply_tags: List[str] = [],
+    apply_priority: bool = False,
+    current_user_id: UUID = Depends(get_current_user_id)
+):
+    """Apply automatic tagging and prioritization suggestions"""
+    from app.services.auto_tagging_service import auto_tagging_service
+
+    result = await auto_tagging_service.apply_suggestions(
+        ticket_id=ticket_id,
+        user_id=current_user_id,
+        apply_tags=apply_tags,
+        apply_priority=apply_priority
+    )
+
+    return result

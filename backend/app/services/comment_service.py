@@ -12,8 +12,8 @@ class CommentService:
         return get_supabase()
 
     @classmethod
-    async def create_comment(cls, payload: CommentCreate, actor_id: UUID) -> Comment:
-        c = cls._c()
+    async def create_comment(cls, payload: CommentCreate, actor_id: UUID, client=None) -> Comment:
+        c = client or cls._c()
         resp = exec_query(
             c.table("comments").insert(
                 {

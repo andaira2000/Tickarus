@@ -11,6 +11,7 @@ from app.models.ai_chat import (
     ChatRole, ChatSessionStatus, ChatResponse
 )
 from app.services.metrics_service import MetricsService
+from app.services.llm_interface import get_llm_service, LLMMessage
 
 logger = logging.getLogger(__name__)
 
@@ -243,30 +244,44 @@ Be concise but thorough. Focus on actionable advice and specific technical solut
             )
     
     async def _generate_ai_response(
-        self, 
-        session_id: UUID, 
-        user_id: UUID
+        self,
+        session_id: UUID,
+        user_id: UUID,
+        use_llm: bool = True
     ) -> tuple[str, Dict[str, Any]]:
-        """Generate AI response (placeholder for LLM integration)"""
-        
+        """Generate AI response using LLM or fallback logic"""
+
         # Get recent conversation context
         messages = await self.get_session_messages(session_id, user_id, limit=self.max_context_messages)
-        
+
         # Get ticket context
         session = await self.get_chat_session(session_id, user_id)
         ticket_context = await self._get_ticket_context(session.ticket_id)
-        
-        # Simulate AI processing delay
-        await asyncio.sleep(1)
-        
-        # For now, return a placeholder response
-        # This is where LLM integration would go
+
+        context_used = {
+            "ticket_title": ticket_context.get("title"),
+            "message_count": len(messages),
+            "has_code_context": False,
+            "llm_used": False
+        }
+
+        if use_llm:
+            try:
+                # Use LLM for response generation
+                response = await self._llm_generate_response(messages, ticket_context)
+                context_used["llm_used"] = True
+                context_used["token_usage"] = response.get("token_usage", 0)
+                return response["content"], context_used
+            except Exception as e:
+                logger.warning(f"LLM response generation failed: {e}. Using fallback.")
+
+        # Fallback logic
         last_user_message = next(
             (msg.content for msg in reversed(messages) if msg.role == ChatRole.USER),
             "Hello"
         )
-        
-        # Simple response generation (to be replaced with LLM)
+
+        # Simple response generation
         if "error" in last_user_message.lower():
             response = "I can help you analyze this error. Can you provide more details about when this error occurs and any relevant log messages?"
         elif "database" in last_user_message.lower():
@@ -275,14 +290,55 @@ Be concise but thorough. Focus on actionable advice and specific technical solut
             response = "Performance issues can have several causes. Let's start by identifying:\n1. When did you first notice the slowdown?\n2. Is it affecting specific features or the entire application?\n3. Have there been recent deployments?\n\nI can help analyze the bottlenecks once we narrow down the scope."
         else:
             response = f"I understand you're asking about: {last_user_message[:100]}...\n\nBased on the ticket context, I can help you analyze this issue. Could you provide more specific details about what you've already tried?"
-        
-        context_used = {
-            "ticket_title": ticket_context.get("title"),
-            "message_count": len(messages),
-            "has_code_context": False  # Would be True with real repo integration
-        }
-        
+
         return response, context_used
+
+    async def _llm_generate_response(
+        self,
+        messages: List[ChatMessage],
+        ticket_context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generate response using LLM"""
+
+        # Build conversation history for LLM
+        llm_messages = [
+            LLMMessage("system", self.system_prompt)
+        ]
+
+        # Add ticket context as system message
+        context_parts = [
+            f"TICKET CONTEXT:",
+            f"Title: {ticket_context.get('title', 'N/A')}",
+            f"Description: {ticket_context.get('description', 'N/A')}",
+            f"Status: {ticket_context.get('status', 'N/A')}",
+            f"Team: {ticket_context.get('team_name', 'N/A')}"
+        ]
+
+        if ticket_context.get('recent_comments'):
+            context_parts.append("Recent Comments:")
+            for comment in ticket_context['recent_comments'][:3]:
+                context_parts.append(f"- {comment['content'][:150]}...")
+
+        context_message = "\n".join(context_parts)
+        llm_messages.append(LLMMessage("system", context_message))
+
+        # Add conversation history (exclude system messages)
+        for msg in messages[-8:]:  # Last 8 messages for context
+            if msg.role != ChatRole.SYSTEM:
+                llm_messages.append(LLMMessage(msg.role.value, msg.content))
+
+        # Generate response
+        llm_service = get_llm_service()
+        response = await llm_service.generate_response(
+            messages=llm_messages,
+            max_tokens=self.max_tokens_per_request,
+            temperature=0.7
+        )
+
+        return {
+            "content": response.content,
+            "token_usage": response.usage.get("total_tokens", 0)
+        }
     
     async def _get_ticket_context(self, ticket_id: UUID) -> Dict[str, Any]:
         """Get ticket details for AI context"""

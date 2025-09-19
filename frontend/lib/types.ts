@@ -145,3 +145,41 @@ export interface TicketFilters {
   // For backend filtering - will be populated by backend based on current user
   created_by_me?: boolean;
 }
+
+// AI Chat Types
+export interface ChatSession {
+  id: string;
+  ticket_id: string;
+  user_id: string;
+  title?: string;
+  status: 'active' | 'closed';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  metadata?: Record<string, any>;
+  token_count?: number;
+  created_at: string;
+}
+
+export interface ChatSessionCreate {
+  ticket_id: string;
+  title?: string;
+  initial_message?: string;
+}
+
+export interface ChatMessageCreate {
+  content: string;
+  role: 'user';
+}
+
+export interface ChatResponse {
+  message: ChatMessage;
+  session_updated: boolean;
+  context_used?: Record<string, any>;
+}

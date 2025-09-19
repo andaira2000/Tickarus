@@ -13,3 +13,14 @@ venv
 __pycache__/
 tmp/
 .cache/
+migrations/
+docker-compose.yml
+Dockerfile
+README.md
+.dockerignore
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/

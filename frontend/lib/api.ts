@@ -1,18 +1,23 @@
 import axios from 'axios';
-import { 
-  AuthResponse, 
+import {
+  AuthResponse,
   User,
   SystemUser,
-  Team, 
-  TeamMember, 
-  Ticket, 
-  TicketCreate, 
-  TicketUpdate, 
-  TicketList, 
-  Comment, 
-  Tag, 
+  Team,
+  TeamMember,
+  Ticket,
+  TicketCreate,
+  TicketUpdate,
+  TicketList,
+  Comment,
+  Tag,
   TicketFilters,
-  TeamRole
+  TeamRole,
+  ChatSession,
+  ChatSessionCreate,
+  ChatMessage,
+  ChatMessageCreate,
+  ChatResponse
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -212,6 +217,41 @@ class ApiClient {
 
   async getSystemUser(systemUserId: string) {
     const response = await this.client.get<SystemUser>(`/api/system-users/${systemUserId}`);
+    return response.data;
+  }
+
+  // AI Chat endpoints
+  async createChatSession(sessionData: ChatSessionCreate) {
+    const response = await this.client.post<ChatSession>('/api/ai-chat/sessions', sessionData);
+    return response.data;
+  }
+
+  async getChatSessions(limit = 20) {
+    const response = await this.client.get<ChatSession[]>(`/api/ai-chat/sessions?limit=${limit}`);
+    return response.data;
+  }
+
+  async getChatSession(sessionId: string) {
+    const response = await this.client.get<{ messages: ChatMessage[] } & ChatSession>(`/api/ai-chat/sessions/${sessionId}`);
+    return response.data;
+  }
+
+  async sendChatMessage(sessionId: string, messageData: ChatMessageCreate) {
+    const response = await this.client.post<ChatResponse>(`/api/ai-chat/sessions/${sessionId}/messages`, messageData);
+    return response.data;
+  }
+
+  async getChatMessages(sessionId: string, limit = 50) {
+    const response = await this.client.get<ChatMessage[]>(`/api/ai-chat/sessions/${sessionId}/messages?limit=${limit}`);
+    return response.data;
+  }
+
+  async closeChatSession(sessionId: string) {
+    await this.client.post(`/api/ai-chat/sessions/${sessionId}/close`);
+  }
+
+  async getTicketChatSessions(ticketId: string) {
+    const response = await this.client.get<ChatSession[]>(`/api/ai-chat/tickets/${ticketId}/sessions`);
     return response.data;
   }
 }

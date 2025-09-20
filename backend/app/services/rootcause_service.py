@@ -186,13 +186,14 @@ class RootCauseService:
                 client.table("ci_failures")
                 .select("*, github_repositories(full_name)")
                 .eq("ticket_id", ticket["id"])
-                .single()
+                .limit(1)
             )
 
-            if not ci_failure_resp.data:
+            # Check if any CI failure records exist
+            if not ci_failure_resp.data or len(ci_failure_resp.data) == 0:
                 return {"available": False}
 
-            ci_failure = ci_failure_resp.data
+            ci_failure = ci_failure_resp.data[0]
             repo_full_name = ci_failure.get("github_repositories", {}).get("full_name")
             failure_time = ci_failure.get("created_at")
 

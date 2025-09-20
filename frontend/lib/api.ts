@@ -254,6 +254,64 @@ class ApiClient {
     const response = await this.client.get<ChatSession[]>(`/api/ai-chat/tickets/${ticketId}/sessions`);
     return response.data;
   }
+
+  // AI Features endpoints
+  async findSimilarTickets(ticketText: string, limit = 5) {
+    const response = await this.client.post<Array<{
+      id: string;
+      title: string;
+      description: string;
+      team_name: string;
+      status: string;
+      similarity_score: number;
+      created_at: string;
+    }>>('/api/tickets/similar', {
+      ticket_text: ticketText,
+      limit
+    });
+    return response.data;
+  }
+
+  async getAIRootCauseAnalysis(ticketId: string) {
+    const response = await this.client.post<{
+      root_cause: string;
+      confidence_score: number;
+      suggestions: string[];
+      similar_resolved_tickets: Array<{
+        id: string;
+        title: string;
+        resolution: string;
+      }>;
+      analysis_method: string;
+      llm_used: boolean;
+    }>(`/api/tickets/${ticketId}/ai-analysis`);
+    return response.data;
+  }
+
+  async getAutoTaggingSuggestions(title: string, description: string) {
+    const response = await this.client.post<{
+      suggested_tags: string[];
+      suggested_priority: string;
+      confidence_scores: Record<string, number>;
+    }>('/api/tickets/auto-tag', {
+      title,
+      description
+    });
+    return response.data;
+  }
+
+  async logSimilarityClick(clickedTicketId: string, originalTicketId?: string) {
+    await this.client.post('/api/tickets/similarity-click', {
+      clicked_ticket_id: clickedTicketId,
+      original_ticket_id: originalTicketId
+    });
+  }
+
+  async rateAIAnalysis(ticketId: string, rating: 'helpful' | 'not_helpful') {
+    await this.client.post(`/api/tickets/${ticketId}/ai-analysis/rate`, {
+      rating
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

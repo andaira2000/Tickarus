@@ -3,8 +3,11 @@ from typing import List, Dict, Any, Optional
 from uuid import UUID
 from pydantic import BaseModel
 
-from app.auth.auth import get_current_user
-from app.services.comprehensive_evaluation_service import comprehensive_evaluation_service, EvaluationResult
+from app.api.dependencies import get_current_user
+from app.services.comprehensive_evaluation_service import (
+    comprehensive_evaluation_service,
+    EvaluationResult,
+)
 from app.db.database import get_service_client
 
 router = APIRouter(prefix="/evaluation", tags=["evaluation"])
@@ -42,8 +45,7 @@ class TestDataGenerationRequest(BaseModel):
 
 @router.post("/similarity", response_model=Dict[str, Any])
 async def evaluate_similarity_accuracy(
-    request: SimilarityEvaluationRequest,
-    current_user=Depends(get_current_user)
+    request: SimilarityEvaluationRequest, current_user=Depends(get_current_user)
 ):
     """Evaluate similarity detection accuracy (Research Question 1)"""
     try:
@@ -56,7 +58,7 @@ async def evaluate_similarity_accuracy(
         result = await comprehensive_evaluation_service.evaluate_similarity_accuracy(
             test_tickets=request.test_ticket_ids,
             ground_truth_similar=ground_truth_similar,
-            top_k=request.top_k
+            top_k=request.top_k,
         )
 
         return {
@@ -64,7 +66,7 @@ async def evaluate_similarity_accuracy(
             "metrics": result.metrics,
             "detailed_results": result.detailed_results,
             "summary": result.summary,
-            "evaluation_id": str(result.evaluation_id)
+            "evaluation_id": str(result.evaluation_id),
         }
 
     except Exception as e:
@@ -73,20 +75,17 @@ async def evaluate_similarity_accuracy(
 
 @router.post("/rootcause", response_model=Dict[str, Any])
 async def evaluate_rootcause_accuracy(
-    request: RootCauseEvaluationRequest,
-    current_user=Depends(get_current_user)
+    request: RootCauseEvaluationRequest, current_user=Depends(get_current_user)
 ):
     """Evaluate root cause analysis accuracy (Research Question 2)"""
     try:
         # Convert string keys back to UUIDs
-        human_ratings = {
-            UUID(k): v for k, v in request.human_ratings.items()
-        }
+        human_ratings = {UUID(k): v for k, v in request.human_ratings.items()}
 
         result = await comprehensive_evaluation_service.evaluate_rootcause_with_commit_context(
             test_tickets=request.test_ticket_ids,
             human_ratings=human_ratings,
-            test_with_commit_context=request.test_with_commit_context
+            test_with_commit_context=request.test_with_commit_context,
         )
 
         return {
@@ -94,7 +93,7 @@ async def evaluate_rootcause_accuracy(
             "metrics": result.metrics,
             "detailed_results": result.detailed_results,
             "summary": result.summary,
-            "evaluation_id": str(result.evaluation_id)
+            "evaluation_id": str(result.evaluation_id),
         }
 
     except Exception as e:
@@ -103,15 +102,12 @@ async def evaluate_rootcause_accuracy(
 
 @router.post("/tagging", response_model=Dict[str, Any])
 async def evaluate_tagging_accuracy(
-    request: TaggingEvaluationRequest,
-    current_user=Depends(get_current_user)
+    request: TaggingEvaluationRequest, current_user=Depends(get_current_user)
 ):
     """Evaluate auto-tagging and prioritization accuracy (Research Question 3)"""
     try:
         # Convert string keys back to UUIDs
-        ground_truth_tags = {
-            UUID(k): v for k, v in request.ground_truth_tags.items()
-        }
+        ground_truth_tags = {UUID(k): v for k, v in request.ground_truth_tags.items()}
         ground_truth_priorities = {
             UUID(k): v for k, v in request.ground_truth_priorities.items()
         }
@@ -119,7 +115,7 @@ async def evaluate_tagging_accuracy(
         result = await comprehensive_evaluation_service.evaluate_tagging_accuracy(
             test_tickets=request.test_ticket_ids,
             ground_truth_tags=ground_truth_tags,
-            ground_truth_priorities=ground_truth_priorities
+            ground_truth_priorities=ground_truth_priorities,
         )
 
         return {
@@ -127,7 +123,7 @@ async def evaluate_tagging_accuracy(
             "metrics": result.metrics,
             "detailed_results": result.detailed_results,
             "summary": result.summary,
-            "evaluation_id": str(result.evaluation_id)
+            "evaluation_id": str(result.evaluation_id),
         }
 
     except Exception as e:
@@ -136,15 +132,14 @@ async def evaluate_tagging_accuracy(
 
 @router.post("/performance", response_model=Dict[str, Any])
 async def evaluate_performance(
-    request: PerformanceEvaluationRequest,
-    current_user=Depends(get_current_user)
+    request: PerformanceEvaluationRequest, current_user=Depends(get_current_user)
 ):
     """Evaluate system performance under load (Research Question 3)"""
     try:
         result = await comprehensive_evaluation_service.run_performance_benchmark(
             concurrent_users=request.concurrent_users,
             requests_per_user=request.requests_per_user,
-            test_ticket_ids=request.test_ticket_ids
+            test_ticket_ids=request.test_ticket_ids,
         )
 
         return {
@@ -152,7 +147,7 @@ async def evaluate_performance(
             "metrics": result.metrics,
             "detailed_results": result.detailed_results,
             "summary": result.summary,
-            "evaluation_id": str(result.evaluation_id)
+            "evaluation_id": str(result.evaluation_id),
         }
 
     except Exception as e:
@@ -161,15 +156,14 @@ async def evaluate_performance(
 
 @router.post("/generate-test-data", response_model=Dict[str, Any])
 async def generate_test_data(
-    request: TestDataGenerationRequest,
-    current_user=Depends(get_current_user)
+    request: TestDataGenerationRequest, current_user=Depends(get_current_user)
 ):
     """Generate synthetic test data for dissertation evaluation"""
     try:
         result = await comprehensive_evaluation_service.generate_test_dataset(
             num_tickets=request.num_tickets,
             num_similar_groups=request.num_similar_groups,
-            include_commit_failures=request.include_commit_failures
+            include_commit_failures=request.include_commit_failures,
         )
 
         return {
@@ -177,17 +171,18 @@ async def generate_test_data(
             "tickets_created": result["tickets_created"],
             "similar_groups": result["similar_groups"],
             "commit_failure_tickets": result.get("commit_failure_tickets", 0),
-            "test_dataset_id": result["dataset_id"]
+            "test_dataset_id": result["dataset_id"],
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Test data generation failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Test data generation failed: {str(e)}"
+        )
 
 
 @router.get("/results/{evaluation_id}")
 async def get_evaluation_results(
-    evaluation_id: UUID,
-    current_user=Depends(get_current_user)
+    evaluation_id: UUID, current_user=Depends(get_current_user)
 ):
     """Retrieve stored evaluation results"""
     try:
@@ -207,13 +202,13 @@ async def get_evaluation_results(
         return resp.data
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve results: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retrieve results: {str(e)}"
+        )
 
 
 @router.get("/summary")
-async def get_evaluation_summary(
-    current_user=Depends(get_current_user)
-):
+async def get_evaluation_summary(current_user=Depends(get_current_user)):
     """Get summary of all evaluation runs for dissertation report"""
     try:
         c = get_service_client()
@@ -232,7 +227,7 @@ async def get_evaluation_summary(
         summary_stats = {
             "total_evaluations": len(evaluations),
             "by_type": {},
-            "recent_results": evaluations[:10]
+            "recent_results": evaluations[:10],
         }
 
         for eval_result in evaluations:

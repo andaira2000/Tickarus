@@ -15,6 +15,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Badge } from '@/components/ui/badge';
+import { SimilaritySuggestions } from '@/components/ui/similarity-suggestions';
+import { AutoTaggingSuggestions } from '@/components/ui/auto-tagging';
 import { apiClient } from '@/lib/api';
 import { TicketPriority, TicketStatus } from '@/lib/types';
 
@@ -25,6 +28,7 @@ const createTicketSchema = z.object({
   priority: z.enum(['low', 'medium', 'high', 'critical']),
   status: z.enum(['open', 'in_progress', 'in_review', 'resolved', 'closed', 'blocked', 'on_hold']).optional(),
   assignee_id: z.string().optional(),
+  tags: z.array(z.string()).optional(),
 });
 
 type CreateTicketFormData = z.infer<typeof createTicketSchema>;
@@ -32,6 +36,7 @@ type CreateTicketFormData = z.infer<typeof createTicketSchema>;
 function CreateTicketContent() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const { data: teams } = useQuery({
     queryKey: ['teams'],
@@ -47,6 +52,7 @@ function CreateTicketContent() {
       priority: 'medium',
       status: 'open',
       assignee_id: '',
+      tags: [],
     },
   });
 
@@ -60,6 +66,7 @@ function CreateTicketContent() {
         priority: data.priority as TicketPriority,
         status: data.status as TicketStatus || 'open',
         assignee_id: data.assignee_id || undefined,
+        tags: selectedTags.length > 0 ? selectedTags : undefined,
       };
 
       const newTicket = await apiClient.createTicket(ticketData);
@@ -85,13 +92,16 @@ function CreateTicketContent() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Ticket Information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main form */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ticket Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
                 name="title"
@@ -190,23 +200,70 @@ function CreateTicketContent() {
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.back()}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Creating...' : 'Create Ticket'}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+              {/* Selected Tags Display */}
+              {selectedTags.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    Selected Tags
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTags.map((tag, index) => (
+                      <Badge
+                        key={index}
+                        variant="default"
+                        className="cursor-pointer"
+                        onClick={() => {
+                          setSelectedTags(selectedTags.filter((_, i) => i !== index));
+                        }}
+                      >
+                        {tag} ×
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Click on a tag to remove it
+                  </p>
+                </div>
+              )}
+
+                  <div className="flex items-center justify-between pt-6">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => router.back()}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? 'Creating...' : 'Create Ticket'}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* AI Features Sidebar */}
+        <div className="space-y-6">
+          {/* Similarity Suggestions */}
+          <SimilaritySuggestions
+            title={form.watch('title') || ''}
+            description={form.watch('description') || ''}
+          />
+
+          {/* Auto-Tagging Suggestions */}
+          <AutoTaggingSuggestions
+            title={form.watch('title') || ''}
+            description={form.watch('description') || ''}
+            selectedTags={selectedTags}
+            selectedPriority={form.watch('priority') as TicketPriority}
+            onTagsSelected={setSelectedTags}
+            onPrioritySelected={(priority) => form.setValue('priority', priority)}
+          />
+        </div>
+      </div>
     </>
   );
 }

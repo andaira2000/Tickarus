@@ -132,6 +132,69 @@ class AutoTaggingService:
             "matched_rules": matched_rules
         }
 
+    async def auto_tag_ticket(
+        self,
+        title: str,
+        description: str = "",
+        user_id: Optional[UUID] = None,
+        client=None
+    ) -> Dict[str, Any]:
+        """Analyze title and description for automatic tagging and prioritization"""
+        start_time = time.time()
+
+        try:
+            text_content = f"{title} {description}"
+            keywords = self._extract_keywords(text_content)
+
+            suggested_tags = self._analyze_tags(keywords)
+            priority_analysis = self._analyze_priority(keywords, title)
+
+            # Extract just the tag names and suggested priority
+            tag_names = [tag["tag_name"] for tag in suggested_tags]
+            suggested_priority = priority_analysis.get("priority", "medium")
+
+            # Create confidence scores
+            confidence_scores = {}
+            for tag_data in suggested_tags:
+                confidence_scores[tag_data["tag_name"]] = tag_data["confidence"]
+            confidence_scores[f"priority_{suggested_priority}"] = priority_analysis.get("confidence", 0.5)
+
+            result = {
+                "suggested_tags": tag_names,
+                "suggested_priority": suggested_priority,
+                "confidence_scores": confidence_scores,
+                "tag_analysis": suggested_tags,
+                "priority_analysis": priority_analysis
+            }
+
+            # Log metrics if we have a client
+            c = client or self._c()
+            response_time = int((time.time() - start_time) * 1000)
+
+            await MetricsService.log_event(
+                event_type="auto_tagging_suggestions_generated",
+                user_id=user_id,
+                ai_feature="auto_tagging",
+                metadata={
+                    "suggested_tags": tag_names,
+                    "suggested_priority": suggested_priority,
+                    "num_keywords": len(keywords)
+                },
+                response_time_ms=response_time,
+                client=c
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in auto-tagging analysis: {str(e)}")
+            return {
+                "suggested_tags": [],
+                "suggested_priority": "medium",
+                "confidence_scores": {},
+                "error": str(e)
+            }
+
     async def analyze_ticket(self, ticket_id: UUID, user_id: Optional[UUID] = None) -> Dict[str, Any]:
         """Analyze a ticket for automatic tagging and prioritization"""
         start_time = time.time()

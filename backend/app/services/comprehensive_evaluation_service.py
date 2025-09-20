@@ -96,16 +96,40 @@ class ComprehensiveEvaluationService:
             }
         ]
 
-        # Get a test user actor for creating tickets
+        # Get actors for creating tickets (prefer human, fallback to system)
         test_actors = exec_query(
             c.table("actors")
-            .select("id")
-            .eq("actor_type", "user")
+            .select("id, actor_type")
+            .eq("actor_type", "human")
             .limit(5)
         ).data
 
         if not test_actors:
-            raise Exception("No user actors found for test data generation")
+            # Fallback to system actors if no human actors exist
+            test_actors = exec_query(
+                c.table("actors")
+                .select("id, actor_type")
+                .eq("actor_type", "system")
+                .limit(5)
+            ).data
+
+        if not test_actors:
+            raise Exception("No actors found for test data generation. Please create at least one user account first.")
+
+        # Get all existing teams to randomly distribute tickets
+        teams_resp = exec_query(
+            c.table("teams")
+            .select("id")
+        )
+
+        if not teams_resp.data:
+            raise Exception("No teams found. Please create at least one team first.")
+
+        available_teams = [UUID(team["id"]) for team in teams_resp.data]
+
+        def get_random_team_id():
+            """Helper function to get a random team ID from available teams"""
+            return random.choice(available_teams)
 
         created_tickets = []
         similar_groups = {}
@@ -147,7 +171,7 @@ class ComprehensiveEvaluationService:
                 ticket_payload = TicketCreate(
                     title=title,
                     description=description,
-                    team_id=UUID("11111111-1111-1111-1111-111111111111"),  # Default team
+                    team_id=get_random_team_id(),
                     priority=template["priority"],
                     tags=template["tags"] + [f"test-group-{group_idx}"]
                 )
@@ -178,7 +202,7 @@ class ComprehensiveEvaluationService:
             ticket_payload = TicketCreate(
                 title=title,
                 description=description,
-                team_id=UUID("11111111-1111-1111-1111-111111111111"),
+                team_id=get_random_team_id(),
                 priority=random.choice(["low", "medium", "high"]),
                 tags=template["tags"] + ["random-test"]
             )
@@ -205,7 +229,7 @@ class ComprehensiveEvaluationService:
                     ticket_payload = TicketCreate(
                         title=f"CI Build Failure - Commit {random.randint(1000, 9999)}",
                         description=f"Build failed in repository test-repo-{i+1}. Error: {random.choice(['compilation error', 'test failure', 'linting error', 'dependency issue'])}. Branch: {random.choice(['main', 'develop', 'feature/test'])}",
-                        team_id=UUID("11111111-1111-1111-1111-111111111111"),
+                        team_id=get_random_team_id(),
                         priority="high",
                         tags=["ci", "build-failure", "automated"]
                     )
@@ -897,646 +921,6 @@ class ComprehensiveEvaluationService:
         )
 
         return result
-
-
-# Global instance
-comprehensive_evaluation_service = ComprehensiveEvaluationService()
-            },
-            response_time_ms=int((time.time() - start_time) * 1000),
-            client=c
-        )
-
-        return EvaluationResult(
-            task_id=UUID("00000000-0000-0000-0000-000000000001"),  # Placeholder
-            task_type=EvaluationTaskType.SIMILARITY_ACCURACY,
-            accuracy_score=accuracy_at_k,  # Primary metric for Question 1
-            precision=precision,
-            recall=recall,
-            f1_score=f1_score,
-            metadata={
-                "top_k": top_k,
-                "test_tickets_count": len(test_tickets),
-                "individual_results": individual_results,
-                "total_hits": total_hits,
-                "total_predicted": total_predicted,
-                "total_relevant": total_relevant
-            },
-            timestamp=datetime.utcnow()
-        )
-
-    async def evaluate_rootcause_with_commit_context(
-        self,
-        test_tickets: List[UUID],
-        human_ratings: Dict[UUID, int],  # ticket_id -> rating (1-5)
-        test_with_commit_context: bool = True
-    ) -> EvaluationResult:
-        """
-        Evaluate root cause analysis accuracy for Question 2:
-        Measure accuracy with and without commit history/code context
-
-        Args:
-            test_tickets: List of CI-failure ticket IDs to test
-            human_ratings: Ground truth ratings from human evaluators
-            test_with_commit_context: Whether to test with full commit context
-
-        Returns:
-            EvaluationResult comparing AI accuracy with human ratings
-        """
-        start_time = time.time()
-
-        total_ai_score = 0
-        total_human_score = 0
-        correlation_data = []
-        individual_results = []
-
-        c = get_service_client()
-
-        for ticket_id in test_tickets:
-            try:
-                # Perform AI root cause analysis
-                analysis = await rootcause_service.analyze_ticket(
-                    ticket_id=ticket_id,
-                    user_id=None,
-                    use_llm=True,
-                    client=c
-                )
-
-                ai_confidence = analysis.get("confidence_score", 0)
-                commit_context_used = analysis.get("commit_context_used", False)
-                human_rating = human_ratings.get(ticket_id, 0)
-
-                # Scale human rating to 0-1 (from 1-5)
-                normalized_human_rating = (human_rating - 1) / 4 if human_rating > 0 else 0
-
-                total_ai_score += ai_confidence
-                total_human_score += normalized_human_rating
-
-                correlation_data.append((ai_confidence, normalized_human_rating))
-
-                individual_results.append({
-                    "ticket_id": str(ticket_id),
-                    "ai_confidence": ai_confidence,
-                    "human_rating": human_rating,
-                    "normalized_human_rating": normalized_human_rating,
-                    "commit_context_used": commit_context_used,
-                    "root_cause": analysis.get("root_cause", ""),
-                    "suggestions_count": len(analysis.get("suggestions", [])),
-                    "analysis_method": analysis.get("analysis_method", "unknown")
-                })
-
-            except Exception as e:
-                logger.error(f"Error evaluating root cause for ticket {ticket_id}: {str(e)}")
-                continue
-
-        # Calculate correlation metrics
-        if correlation_data:
-            # Simple correlation coefficient
-            n = len(correlation_data)
-            sum_ai = sum(x[0] for x in correlation_data)
-            sum_human = sum(x[1] for x in correlation_data)
-            sum_ai_sq = sum(x[0]**2 for x in correlation_data)
-            sum_human_sq = sum(x[1]**2 for x in correlation_data)
-            sum_ai_human = sum(x[0] * x[1] for x in correlation_data)
-
-            numerator = n * sum_ai_human - sum_ai * sum_human
-            denominator = ((n * sum_ai_sq - sum_ai**2) * (n * sum_human_sq - sum_human**2))**0.5
-            correlation = numerator / denominator if denominator != 0 else 0
-        else:
-            correlation = 0
-
-        # Calculate average scores
-        avg_ai_score = total_ai_score / len(test_tickets) if test_tickets else 0
-        avg_human_score = total_human_score / len(test_tickets) if test_tickets else 0
-
-        # Accuracy as correlation with human ratings
-        accuracy_score = max(0, correlation)  # Normalize to 0-1
-
-        # Calculate precision/recall based on high-confidence predictions
-        high_confidence_threshold = 0.7
-        high_rating_threshold = 0.6  # 3+ stars normalized
-
-        ai_high_conf = [r for r in individual_results if r["ai_confidence"] >= high_confidence_threshold]
-        human_high_rating = [r for r in individual_results if r["normalized_human_rating"] >= high_rating_threshold]
-
-        true_positives = len([r for r in ai_high_conf if r["normalized_human_rating"] >= high_rating_threshold])
-        precision = true_positives / len(ai_high_conf) if ai_high_conf else 0
-        recall = true_positives / len(human_high_rating) if human_high_rating else 0
-        f1_score = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-
-        # Log evaluation metrics
-        await MetricsService.log_event(
-            event_type="rootcause_evaluation_completed",
-            ai_feature="rootcause",
-            metadata={
-                "test_tickets_count": len(test_tickets),
-                "commit_context_enabled": test_with_commit_context,
-                "correlation": correlation,
-                "avg_ai_confidence": avg_ai_score,
-                "avg_human_rating": avg_human_score,
-                "precision": precision,
-                "recall": recall,
-                "f1_score": f1_score
-            },
-            response_time_ms=int((time.time() - start_time) * 1000),
-            client=c
-        )
-
-        return EvaluationResult(
-            task_id=UUID("00000000-0000-0000-0000-000000000002"),  # Placeholder
-            task_type=EvaluationTaskType.ROOTCAUSE_ACCURACY,
-            accuracy_score=accuracy_score,
-            precision=precision,
-            recall=recall,
-            f1_score=f1_score,
-            metadata={
-                "correlation_with_human": correlation,
-                "test_tickets_count": len(test_tickets),
-                "individual_results": individual_results,
-                "avg_ai_confidence": avg_ai_score,
-                "avg_human_rating": avg_human_score,
-                "commit_context_enabled": test_with_commit_context
-            },
-            timestamp=datetime.utcnow()
-        )
-
-    async def evaluate_tagging_accuracy(
-        self,
-        test_tickets: List[UUID],
-        ground_truth_tags: Dict[UUID, List[str]],
-        ground_truth_priorities: Dict[UUID, str]
-    ) -> EvaluationResult:
-        """
-        Evaluate automatic tagging and prioritization accuracy:
-        "Tag/priority accuracy will be benchmarked against a human-labelled test set"
-
-        Args:
-            test_tickets: List of ticket IDs to test
-            ground_truth_tags: Dict mapping ticket_id -> list of correct tags
-            ground_truth_priorities: Dict mapping ticket_id -> correct priority
-
-        Returns:
-            EvaluationResult with tag and priority prediction accuracy
-        """
-        start_time = time.time()
-
-        tag_matches = 0
-        total_predicted_tags = 0
-        total_ground_truth_tags = 0
-        priority_matches = 0
-        individual_results = []
-
-        c = get_service_client()
-
-        for ticket_id in test_tickets:
-            try:
-                # Get ticket content
-                ticket_resp = exec_query(
-                    c.table("tickets")
-                    .select("title, description")
-                    .eq("id", str(ticket_id))
-                    .single()
-                )
-
-                if not ticket_resp.data:
-                    continue
-
-                ticket = ticket_resp.data
-
-                # Get AI tagging suggestions
-                tagging_result = await auto_tagging_service.suggest_tags_and_priority(
-                    title=ticket["title"],
-                    description=ticket.get("description", ""),
-                    user_id=None,
-                    client=c
-                )
-
-                predicted_tags = set(tagging_result.get("suggested_tags", []))
-                predicted_priority = tagging_result.get("suggested_priority", "")
-
-                ground_truth_tags_set = set(ground_truth_tags.get(ticket_id, []))
-                ground_truth_priority = ground_truth_priorities.get(ticket_id, "")
-
-                # Calculate tag metrics
-                tag_intersection = predicted_tags.intersection(ground_truth_tags_set)
-                tag_matches += len(tag_intersection)
-                total_predicted_tags += len(predicted_tags)
-                total_ground_truth_tags += len(ground_truth_tags_set)
-
-                # Calculate priority accuracy
-                priority_correct = (predicted_priority.lower() == ground_truth_priority.lower())
-                if priority_correct:
-                    priority_matches += 1
-
-                # Individual results
-                tag_precision = len(tag_intersection) / len(predicted_tags) if predicted_tags else 0
-                tag_recall = len(tag_intersection) / len(ground_truth_tags_set) if ground_truth_tags_set else 0
-
-                individual_results.append({
-                    "ticket_id": str(ticket_id),
-                    "predicted_tags": list(predicted_tags),
-                    "ground_truth_tags": list(ground_truth_tags_set),
-                    "predicted_priority": predicted_priority,
-                    "ground_truth_priority": ground_truth_priority,
-                    "tag_precision": tag_precision,
-                    "tag_recall": tag_recall,
-                    "priority_correct": priority_correct,
-                    "tag_matches": len(tag_intersection)
-                })
-
-            except Exception as e:
-                logger.error(f"Error evaluating tagging for ticket {ticket_id}: {str(e)}")
-                continue
-
-        # Calculate overall metrics
-        tag_precision = tag_matches / total_predicted_tags if total_predicted_tags > 0 else 0
-        tag_recall = tag_matches / total_ground_truth_tags if total_ground_truth_tags > 0 else 0
-        tag_f1 = (2 * tag_precision * tag_recall) / (tag_precision + tag_recall) if (tag_precision + tag_recall) > 0 else 0
-
-        priority_accuracy = priority_matches / len(test_tickets) if test_tickets else 0
-
-        # Combined accuracy score (weighted average)
-        overall_accuracy = (tag_f1 * 0.7) + (priority_accuracy * 0.3)
-
-        # Log evaluation metrics
-        await MetricsService.log_event(
-            event_type="tagging_evaluation_completed",
-            ai_feature="auto_tagging",
-            metadata={
-                "test_tickets_count": len(test_tickets),
-                "tag_precision": tag_precision,
-                "tag_recall": tag_recall,
-                "tag_f1_score": tag_f1,
-                "priority_accuracy": priority_accuracy,
-                "overall_accuracy": overall_accuracy
-            },
-            response_time_ms=int((time.time() - start_time) * 1000),
-            client=c
-        )
-
-        return EvaluationResult(
-            task_id=UUID("00000000-0000-0000-0000-000000000003"),  # Placeholder
-            task_type=EvaluationTaskType.TAGGING_ACCURACY,
-            accuracy_score=overall_accuracy,
-            precision=tag_precision,
-            recall=tag_recall,
-            f1_score=tag_f1,
-            metadata={
-                "tag_precision": tag_precision,
-                "tag_recall": tag_recall,
-                "tag_f1_score": tag_f1,
-                "priority_accuracy": priority_accuracy,
-                "priority_matches": priority_matches,
-                "test_tickets_count": len(test_tickets),
-                "individual_results": individual_results,
-                "total_tag_matches": tag_matches,
-                "total_predicted_tags": total_predicted_tags,
-                "total_ground_truth_tags": total_ground_truth_tags
-            },
-            timestamp=datetime.utcnow()
-        )
-
-    async def run_performance_benchmark(
-        self,
-        concurrent_users: List[int] = [1, 5, 10, 25, 50],
-        requests_per_user: int = 10,
-        test_ticket_ids: List[UUID] = None
-    ) -> EvaluationResult:
-        """
-        Run performance benchmarks for Question 3:
-        "How does the platform perform and scale under varying workloads"
-
-        Args:
-            concurrent_users: List of concurrent user counts to test
-            requests_per_user: Number of requests each user makes
-            test_ticket_ids: Ticket IDs to use for testing (if None, uses synthetic)
-
-        Returns:
-            EvaluationResult with performance metrics across load levels
-        """
-        import asyncio
-
-        start_time = time.time()
-        load_test_results = []
-
-        # If no test tickets provided, create some synthetic ones
-        if not test_ticket_ids:
-            test_ticket_ids = await self._create_synthetic_test_tickets(10)
-
-        for user_count in concurrent_users:
-            logger.info(f"Running load test with {user_count} concurrent users")
-
-            # Create tasks for concurrent execution
-            tasks = []
-            for user_id in range(user_count):
-                for request_id in range(requests_per_user):
-                    # Vary the type of AI operation
-                    if request_id % 3 == 0:
-                        # Similarity search
-                        task = self._benchmark_similarity_request(test_ticket_ids[request_id % len(test_ticket_ids)])
-                    elif request_id % 3 == 1:
-                        # Root cause analysis
-                        task = self._benchmark_rootcause_request(test_ticket_ids[request_id % len(test_ticket_ids)])
-                    else:
-                        # Auto tagging
-                        task = self._benchmark_tagging_request(test_ticket_ids[request_id % len(test_ticket_ids)])
-
-                    tasks.append(task)
-
-            # Execute all tasks concurrently and measure performance
-            user_start_time = time.time()
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            user_end_time = time.time()
-
-            # Analyze results
-            successful_requests = [r for r in results if not isinstance(r, Exception)]
-            failed_requests = [r for r in results if isinstance(r, Exception)]
-
-            if successful_requests:
-                response_times = [r["response_time"] for r in successful_requests]
-                avg_response_time = sum(response_times) / len(response_times)
-                p95_response_time = sorted(response_times)[int(len(response_times) * 0.95)]
-                p99_response_time = sorted(response_times)[int(len(response_times) * 0.99)]
-            else:
-                avg_response_time = p95_response_time = p99_response_time = 0
-
-            total_time = user_end_time - user_start_time
-            throughput = len(successful_requests) / total_time if total_time > 0 else 0
-            error_rate = len(failed_requests) / len(results) if results else 0
-
-            load_test_results.append({
-                "concurrent_users": user_count,
-                "total_requests": len(tasks),
-                "successful_requests": len(successful_requests),
-                "failed_requests": len(failed_requests),
-                "error_rate": error_rate,
-                "total_time_seconds": total_time,
-                "throughput_rps": throughput,
-                "avg_response_time_ms": avg_response_time,
-                "p95_response_time_ms": p95_response_time,
-                "p99_response_time_ms": p99_response_time
-            })
-
-        # Calculate overall performance score
-        # Lower response times and higher throughput = better score
-        if load_test_results:
-            baseline_result = load_test_results[0]  # Single user performance
-            max_load_result = load_test_results[-1]  # Maximum load performance
-
-            # Performance degradation factor
-            degradation_factor = max_load_result["avg_response_time_ms"] / baseline_result["avg_response_time_ms"] if baseline_result["avg_response_time_ms"] > 0 else 1
-
-            # Throughput scaling factor
-            ideal_throughput = baseline_result["throughput_rps"] * concurrent_users[-1]
-            actual_throughput = max_load_result["throughput_rps"]
-            throughput_efficiency = actual_throughput / ideal_throughput if ideal_throughput > 0 else 0
-
-            # Combined performance score (0-1, higher is better)
-            performance_score = (throughput_efficiency * 0.6) + ((1 / degradation_factor) * 0.4)
-        else:
-            performance_score = 0
-
-        # Log performance benchmark results
-        c = get_service_client()
-        await MetricsService.log_event(
-            event_type="performance_benchmark_completed",
-            ai_feature="platform",
-            metadata={
-                "concurrent_users_tested": concurrent_users,
-                "requests_per_user": requests_per_user,
-                "performance_score": performance_score,
-                "load_test_results": load_test_results
-            },
-            response_time_ms=int((time.time() - start_time) * 1000),
-            client=c
-        )
-
-        return EvaluationResult(
-            task_id=UUID("00000000-0000-0000-0000-000000000004"),  # Placeholder
-            task_type=EvaluationTaskType.PERFORMANCE_BENCHMARK,
-            accuracy_score=performance_score,
-            precision=throughput_efficiency,
-            recall=1 / degradation_factor if degradation_factor > 0 else 0,
-            f1_score=performance_score,  # Combined metric
-            metadata={
-                "load_test_results": load_test_results,
-                "throughput_efficiency": throughput_efficiency,
-                "performance_degradation": degradation_factor,
-                "concurrent_users_tested": concurrent_users,
-                "test_duration_seconds": time.time() - start_time
-            },
-            timestamp=datetime.utcnow()
-        )
-
-    async def _benchmark_similarity_request(self, ticket_id: UUID) -> Dict[str, Any]:
-        """Benchmark a single similarity request"""
-        start_time = time.time()
-        try:
-            c = get_service_client()
-
-            # Get ticket
-            ticket_resp = exec_query(
-                c.table("tickets")
-                .select("title, description")
-                .eq("id", str(ticket_id))
-                .single()
-            )
-
-            if ticket_resp.data:
-                ticket_text = f"{ticket_resp.data['title']} {ticket_resp.data.get('description', '')}"
-
-                # Perform similarity search
-                results = await self.similarity_service.find_similar_tickets(
-                    ticket_text=ticket_text,
-                    current_ticket_id=ticket_id,
-                    limit=5,
-                    user_id=None,
-                    client=c
-                )
-
-                return {
-                    "operation": "similarity",
-                    "success": True,
-                    "response_time": (time.time() - start_time) * 1000,
-                    "results_count": len(results)
-                }
-        except Exception as e:
-            return {
-                "operation": "similarity",
-                "success": False,
-                "response_time": (time.time() - start_time) * 1000,
-                "error": str(e)
-            }
-
-    async def _benchmark_rootcause_request(self, ticket_id: UUID) -> Dict[str, Any]:
-        """Benchmark a single root cause analysis request"""
-        start_time = time.time()
-        try:
-            analysis = await rootcause_service.analyze_ticket(
-                ticket_id=ticket_id,
-                user_id=None,
-                use_llm=True,
-                client=get_service_client()
-            )
-
-            return {
-                "operation": "rootcause",
-                "success": True,
-                "response_time": (time.time() - start_time) * 1000,
-                "confidence": analysis.get("confidence_score", 0)
-            }
-        except Exception as e:
-            return {
-                "operation": "rootcause",
-                "success": False,
-                "response_time": (time.time() - start_time) * 1000,
-                "error": str(e)
-            }
-
-    async def _benchmark_tagging_request(self, ticket_id: UUID) -> Dict[str, Any]:
-        """Benchmark a single auto-tagging request"""
-        start_time = time.time()
-        try:
-            c = get_service_client()
-
-            # Get ticket
-            ticket_resp = exec_query(
-                c.table("tickets")
-                .select("title, description")
-                .eq("id", str(ticket_id))
-                .single()
-            )
-
-            if ticket_resp.data:
-                result = await auto_tagging_service.suggest_tags_and_priority(
-                    title=ticket_resp.data["title"],
-                    description=ticket_resp.data.get("description", ""),
-                    user_id=None,
-                    client=c
-                )
-
-                return {
-                    "operation": "tagging",
-                    "success": True,
-                    "response_time": (time.time() - start_time) * 1000,
-                    "tags_count": len(result.get("suggested_tags", []))
-                }
-        except Exception as e:
-            return {
-                "operation": "tagging",
-                "success": False,
-                "response_time": (time.time() - start_time) * 1000,
-                "error": str(e)
-            }
-
-    async def _create_synthetic_test_tickets(self, count: int) -> List[UUID]:
-        """Create synthetic tickets for testing"""
-        c = get_service_client()
-
-        # Get a team to assign tickets to
-        teams_resp = exec_query(c.table("teams").select("id").limit(1))
-        if not teams_resp.data:
-            return []
-
-        team_id = teams_resp.data[0]["id"]
-
-        # Get CI bot actor
-        from app.services.actor_service import ActorService
-        ci_bot_actor = await ActorService.get_actor_for_system_user(
-            UUID("00000000-0000-4000-8000-000000000001"), client=c
-        )
-
-        if not ci_bot_actor:
-            return []
-
-        ticket_ids = []
-        synthetic_tickets = [
-            ("Database Connection Timeout", "Connection to PostgreSQL database times out after 30 seconds"),
-            ("Memory Leak in User Service", "Application memory usage keeps increasing over time"),
-            ("API Rate Limiting Error", "Too many requests error from external API"),
-            ("CSS Layout Breaking", "Responsive layout breaks on mobile devices"),
-            ("Authentication Token Expired", "JWT tokens expiring prematurely"),
-            ("Search Query Performance", "Search functionality is extremely slow"),
-            ("File Upload Failing", "Users cannot upload files larger than 10MB"),
-            ("Email Notification Bug", "Email notifications not being sent"),
-            ("Cache Invalidation Issue", "Stale data being served from cache"),
-            ("Docker Build Failure", "Docker image build fails on CI/CD pipeline")
-        ]
-
-        for i, (title, description) in enumerate(synthetic_tickets[:count]):
-            from app.models.ticket import TicketCreate, TicketStatus, TicketPriority
-
-            ticket_data = TicketCreate(
-                team_id=UUID(team_id),
-                title=f"[BENCHMARK] {title}",
-                description=description,
-                status=TicketStatus.OPEN,
-                priority=TicketPriority.MEDIUM
-            )
-
-            from app.services.ticket_service import TicketService
-            ticket = await TicketService.create_ticket(
-                ticket_data, ci_bot_actor.id, client=c
-            )
-
-            ticket_ids.append(ticket.id)
-
-        return ticket_ids
-
-    async def run_comprehensive_evaluation(
-        self,
-        similarity_test_data: Dict = None,
-        rootcause_test_data: Dict = None,
-        tagging_test_data: Dict = None,
-        performance_test_config: Dict = None
-    ) -> Dict[str, EvaluationResult]:
-        """
-        Run complete evaluation suite for all dissertation questions
-
-        Returns:
-            Dict with results for each evaluation type
-        """
-        logger.info("Starting comprehensive AI evaluation suite")
-
-        results = {}
-
-        # Question 1: Similarity accuracy
-        if similarity_test_data:
-            logger.info("Evaluating similarity detection accuracy")
-            results["similarity"] = await self.evaluate_similarity_accuracy(
-                test_tickets=similarity_test_data.get("test_tickets", []),
-                ground_truth_similar=similarity_test_data.get("ground_truth", {}),
-                top_k=similarity_test_data.get("top_k", 3)
-            )
-
-        # Question 2: Root cause accuracy with commit context
-        if rootcause_test_data:
-            logger.info("Evaluating root cause analysis accuracy")
-            results["rootcause"] = await self.evaluate_rootcause_with_commit_context(
-                test_tickets=rootcause_test_data.get("test_tickets", []),
-                human_ratings=rootcause_test_data.get("human_ratings", {}),
-                test_with_commit_context=rootcause_test_data.get("use_commit_context", True)
-            )
-
-        # Auto-tagging accuracy
-        if tagging_test_data:
-            logger.info("Evaluating auto-tagging accuracy")
-            results["tagging"] = await self.evaluate_tagging_accuracy(
-                test_tickets=tagging_test_data.get("test_tickets", []),
-                ground_truth_tags=tagging_test_data.get("ground_truth_tags", {}),
-                ground_truth_priorities=tagging_test_data.get("ground_truth_priorities", {})
-            )
-
-        # Question 3: Performance benchmarks
-        if performance_test_config:
-            logger.info("Running performance benchmarks")
-            results["performance"] = await self.run_performance_benchmark(
-                concurrent_users=performance_test_config.get("concurrent_users", [1, 5, 10]),
-                requests_per_user=performance_test_config.get("requests_per_user", 10),
-                test_ticket_ids=performance_test_config.get("test_ticket_ids")
-            )
-
-        logger.info("Comprehensive evaluation completed")
-        return results
 
 
 # Global instance

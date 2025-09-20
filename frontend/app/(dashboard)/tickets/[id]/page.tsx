@@ -19,6 +19,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Separator } from '@/components/ui/separator';
 import { TicketCreator, TicketCreatorBadge } from '@/components/ui/ticket-creator';
 import { AIChat } from '@/components/ui/ai-chat';
+import { AIAnalysis } from '@/components/ui/ai-analysis';
 import { apiClient } from '@/lib/api';
 import { TicketPriority, TicketStatus } from '@/lib/types';
 
@@ -388,6 +389,9 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
               )}
             </CardContent>
           </Card>
+
+          {/* AI Analysis */}
+          <AIAnalysis ticketId={ticketId} />
 
           {/* AI Chat */}
           <AIChat ticketId={ticketId} />

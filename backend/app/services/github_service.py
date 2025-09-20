@@ -22,6 +22,8 @@ from ..models.github_repository import (
     GitHubWebhookPayload,
 )
 from ..models.ticket import TicketCreate, TicketStatus, TicketPriority
+import re
+from collections import defaultdict
 
 
 logger = logging.getLogger(__name__)
@@ -374,7 +376,9 @@ class GitHubService:
         # Get CI bot actor ID
         from ..services.actor_service import ActorService
 
-        ci_bot_actor = await ActorService.get_actor_for_system_user(UUID(CI_BOT_UUID), client=supabase)
+        ci_bot_actor = await ActorService.get_actor_for_system_user(
+            UUID(CI_BOT_UUID), client=supabase
+        )
 
         if not ci_bot_actor:
             logger.error("CI Bot actor not found")
@@ -573,3 +577,801 @@ class GitHubService:
 
         result = query.execute()
         return [GitHubRepository(**repo) for repo in result.data]
+
+    async def analyze_recent_commits(
+        self, full_name: str, failure_time: datetime, max_commits: int = 50
+    ) -> Dict:
+        """
+        Analyze ALL commits in the repository (up to max_commits)
+        This provides complete contextual information for root cause analysis
+        """
+        try:
+            if not self.github_client:
+                return {"error": "GitHub client not available"}
+
+            repo = self.github_client.get_repo(full_name)
+
+            # Get ALL commits (up to max_commits for performance)
+            commits = list(repo.get_commits()[:max_commits])
+
+            commit_analysis = {
+                "total_commits": len(commits),
+                "commits": [],
+                "risk_indicators": [],
+                "file_changes": defaultdict(int),
+                "authors": defaultdict(int),
+                "commit_patterns": self._analyze_commit_patterns(commits),
+            }
+
+            for commit in commits[
+                :20
+            ]:  # Analyze first 20 commits for detailed analysis
+                commit_data = await self._analyze_single_commit(repo, commit)
+                commit_analysis["commits"].append(commit_data)
+
+                # Track file changes
+                for file_info in commit_data.get("files", []):
+                    commit_analysis["file_changes"][file_info["filename"]] += 1
+
+                # Track authors
+                if commit.author:
+                    commit_analysis["authors"][commit.author.login] += 1
+
+                # Identify risk indicators
+                risk_indicators = self._identify_commit_risks(commit_data)
+                commit_analysis["risk_indicators"].extend(risk_indicators)
+
+            return commit_analysis
+
+        except Exception as e:
+            logger.error(f"Error analyzing recent commits: {str(e)}")
+            return {"error": str(e)}
+
+    async def _analyze_single_commit(self, repo, commit) -> Dict:
+        """Analyze a single commit for potential issues"""
+        try:
+            commit_data = {
+                "sha": commit.sha[:8],
+                "message": commit.commit.message,
+                "author": commit.author.login if commit.author else "Unknown",
+                "date": commit.commit.author.date.isoformat(),
+                "files": [],
+                "stats": {
+                    "additions": commit.stats.additions,
+                    "deletions": commit.stats.deletions,
+                    "total": commit.stats.total,
+                },
+            }
+
+            # Analyze changed files
+            for file in commit.files:
+                file_info = {
+                    "filename": file.filename,
+                    "status": file.status,
+                    "additions": file.additions,
+                    "deletions": file.deletions,
+                    "changes": file.changes,
+                    "patch": (
+                        file.patch[:1000] if file.patch else None
+                    ),  # First 1000 chars
+                }
+
+                # Add code analysis for this file
+                file_info.update(self._analyze_file_changes(file))
+                commit_data["files"].append(file_info)
+
+            return commit_data
+
+        except Exception as e:
+            logger.warning(f"Error analyzing commit {commit.sha}: {str(e)}")
+            return {"sha": commit.sha[:8], "error": str(e)}
+
+    def _analyze_file_changes(self, file) -> Dict:
+        """Analyze code changes in a file for potential issues"""
+        analysis = {
+            "risk_level": "low",
+            "issues": [],
+            "language": self._detect_language(file.filename),
+            "is_critical_file": self._is_critical_file(file.filename),
+        }
+
+        if not file.patch:
+            return analysis
+
+        patch_lines = file.patch.split("\n")
+        added_lines = [
+            line[1:]
+            for line in patch_lines
+            if line.startswith("+") and not line.startswith("+++")
+        ]
+        removed_lines = [
+            line[1:]
+            for line in patch_lines
+            if line.startswith("-") and not line.startswith("---")
+        ]
+
+        # Analyze added code for potential issues
+        for line in added_lines:
+            line = line.strip()
+
+            # Check for common problematic patterns
+            if self._contains_security_risk(line):
+                analysis["issues"].append(f"Security risk: {line[:50]}...")
+                analysis["risk_level"] = "high"
+
+            elif self._contains_performance_risk(line):
+                analysis["issues"].append(f"Performance risk: {line[:50]}...")
+                if analysis["risk_level"] == "low":
+                    analysis["risk_level"] = "medium"
+
+            elif self._contains_error_handling_issues(line):
+                analysis["issues"].append(f"Error handling issue: {line[:50]}...")
+                if analysis["risk_level"] == "low":
+                    analysis["risk_level"] = "medium"
+
+        # Large changes are riskier
+        if file.changes > 100:
+            analysis["issues"].append(f"Large change: {file.changes} lines modified")
+            if analysis["risk_level"] == "low":
+                analysis["risk_level"] = "medium"
+
+        return analysis
+
+    def _analyze_commit_patterns(self, commits) -> Dict:
+        """Analyze patterns across multiple commits"""
+        patterns = {
+            "commit_frequency": len(commits),
+            "message_patterns": [],
+            "time_patterns": [],
+            "size_patterns": [],
+        }
+
+        # Analyze commit messages for patterns
+        urgent_keywords = [
+            "fix",
+            "hotfix",
+            "urgent",
+            "critical",
+            "bug",
+            "error",
+            "crash",
+        ]
+        experimental_keywords = ["experiment", "test", "try", "attempt", "wip", "draft"]
+
+        urgent_commits = 0
+        experimental_commits = 0
+
+        for commit in commits:
+            message = commit.commit.message.lower()
+
+            if any(keyword in message for keyword in urgent_keywords):
+                urgent_commits += 1
+
+            if any(keyword in message for keyword in experimental_keywords):
+                experimental_commits += 1
+
+        patterns["urgent_commits"] = urgent_commits
+        patterns["experimental_commits"] = experimental_commits
+
+        if urgent_commits > len(commits) * 0.3:
+            patterns["message_patterns"].append("High frequency of urgent/fix commits")
+
+        if experimental_commits > len(commits) * 0.2:
+            patterns["message_patterns"].append(
+                "High frequency of experimental commits"
+            )
+
+        return patterns
+
+    def _identify_commit_risks(self, commit_data: Dict) -> List[str]:
+        """Identify risk indicators in a commit"""
+        risks = []
+
+        # Large commits are risky
+        if commit_data["stats"]["total"] > 200:
+            risks.append(f"Large commit: {commit_data['stats']['total']} lines changed")
+
+        # Check commit message for risk indicators
+        message = commit_data["message"].lower()
+        risky_phrases = [
+            "quick fix",
+            "hotfix",
+            "urgent",
+            "temporary",
+            "hack",
+            "todo",
+            "fixme",
+            "workaround",
+            "disable",
+            "comment out",
+        ]
+
+        for phrase in risky_phrases:
+            if phrase in message:
+                risks.append(f"Risky commit message pattern: '{phrase}'")
+
+        # Check for critical file modifications
+        critical_files = 0
+        for file_info in commit_data.get("files", []):
+            if file_info.get("is_critical_file"):
+                critical_files += 1
+
+        if critical_files > 0:
+            risks.append(f"Modified {critical_files} critical files")
+
+        return risks
+
+    def _detect_language(self, filename: str) -> str:
+        """Detect programming language from filename"""
+        extensions = {
+            ".py": "python",
+            ".js": "javascript",
+            ".ts": "typescript",
+            ".jsx": "react",
+            ".tsx": "react-typescript",
+            ".java": "java",
+            ".go": "go",
+            ".cpp": "cpp",
+            ".c": "c",
+            ".rs": "rust",
+            ".rb": "ruby",
+            ".php": "php",
+            ".cs": "csharp",
+            ".sql": "sql",
+            ".yaml": "yaml",
+            ".yml": "yaml",
+            ".json": "json",
+            ".xml": "xml",
+            ".html": "html",
+            ".css": "css",
+            ".scss": "scss",
+            ".sh": "shell",
+            ".dockerfile": "docker",
+            ".md": "markdown",
+        }
+
+        for ext, lang in extensions.items():
+            if filename.lower().endswith(ext):
+                return lang
+
+        return "unknown"
+
+    def _is_critical_file(self, filename: str) -> bool:
+        """Check if a file is considered critical"""
+        critical_patterns = [
+            # Config files
+            r"\.env",
+            r"config\.(py|js|json|yaml|yml)",
+            r"settings\.(py|js)",
+            # Build/deployment files
+            r"Dockerfile",
+            r"docker-compose\.ya?ml",
+            r"package\.json",
+            r"requirements\.txt",
+            r"Makefile",
+            r"\.github/workflows/",
+            r"\.gitlab-ci\.ya?ml",
+            # Database files
+            r"migrations?/",
+            r"schema\.(sql|py|js)",
+            r"models\.(py|js)",
+            # Authentication/security
+            r"auth\.(py|js)",
+            r"security\.(py|js)",
+            r"middleware\.(py|js)",
+            # Main application files
+            r"main\.(py|js)",
+            r"app\.(py|js)",
+            r"server\.(py|js)",
+            r"index\.(py|js|html)",
+            # Core business logic
+            r"core/",
+            r"services/",
+            r"controllers/",
+            r"handlers/",
+        ]
+
+        for pattern in critical_patterns:
+            if re.search(pattern, filename, re.IGNORECASE):
+                return True
+
+        return False
+
+    def _contains_security_risk(self, line: str) -> bool:
+        """Check if code line contains security risks"""
+        security_patterns = [
+            r'password\s*=\s*["\'][^"\']+["\']',  # Hardcoded passwords
+            r'secret\s*=\s*["\'][^"\']+["\']',  # Hardcoded secrets
+            r'api_?key\s*=\s*["\'][^"\']+["\']',  # Hardcoded API keys
+            r"exec\s*\(",  # Code execution
+            r"eval\s*\(",  # Code evaluation
+            r"subprocess\.",  # Subprocess calls
+            r"shell\s*=\s*True",  # Shell injection risk
+            r"\.innerHTML\s*=",  # XSS risk
+            r"document\.write\s*\(",  # XSS risk
+            r"sql.*\+.*\+",  # SQL injection risk
+        ]
+
+        for pattern in security_patterns:
+            if re.search(pattern, line, re.IGNORECASE):
+                return True
+
+        return False
+
+    def _contains_performance_risk(self, line: str) -> bool:
+        """Check if code line contains performance risks"""
+        performance_patterns = [
+            r"for.*in.*for.*in",  # Nested loops
+            r"while.*while",  # Nested while loops
+            r"\.sync\(",  # Synchronous calls
+            r"time\.sleep\(",  # Blocking sleep
+            r"\.all\(\)\.count\(\)",  # Inefficient database queries
+            r"SELECT \* FROM",  # SELECT * queries
+            r"setTimeout.*setTimeout",  # Nested timeouts
+            r"setInterval",  # Intervals
+        ]
+
+        for pattern in performance_patterns:
+            if re.search(pattern, line, re.IGNORECASE):
+                return True
+
+        return False
+
+    def _contains_error_handling_issues(self, line: str) -> bool:
+        """Check if code line has error handling issues"""
+        error_patterns = [
+            r"except:?\s*$",  # Bare except
+            r"catch\s*\(\s*\)\s*\{",  # Empty catch
+            r"pass\s*$",  # Empty pass
+            r"// TODO",  # TODO comments
+            r"# TODO",  # TODO comments
+            r"console\.log\(",  # Debug logging
+            r"print\(",  # Debug printing
+            r'throw\s+new\s+Error\(\s*["\']["\']',  # Empty error messages
+        ]
+
+        for pattern in error_patterns:
+            if re.search(pattern, line, re.IGNORECASE):
+                return True
+
+        return False
+
+    async def get_commit_context_for_rootcause(
+        self,
+        full_name: str,
+        failure_time: datetime,
+        failure_logs: str = "",
+        include_full_codebase: bool = True,
+    ) -> Dict:
+        """
+        Get comprehensive commit context for enhanced root cause analysis
+        This is the main method called by the root cause service
+        """
+        try:
+            # Analyze ALL commits in repository
+            commit_analysis = await self.analyze_recent_commits(full_name, failure_time)
+
+            # Get repository context
+            repo_context = await self.get_repository_context(full_name)
+
+            # Correlate failure logs with code changes
+            correlation = self._correlate_logs_with_commits(
+                failure_logs, commit_analysis.get("commits", [])
+            )
+
+            # Get full codebase if requested (for dissertation with small repos)
+            full_codebase = None
+            if include_full_codebase:
+                full_codebase = await self._get_full_repository_code(full_name)
+
+            # Build comprehensive context
+            context = {
+                "repository": {
+                    "name": full_name,
+                    "language": repo_context.get("primary_language", "unknown"),
+                    "tech_stack": repo_context.get("tech_stack", []),
+                },
+                "commit_analysis": commit_analysis,
+                "log_correlation": correlation,
+                "risk_assessment": self._assess_overall_risk(commit_analysis),
+                "suggested_focus_areas": self._suggest_focus_areas(
+                    commit_analysis, correlation
+                ),
+                "full_codebase": full_codebase,
+            }
+
+            return context
+
+        except Exception as e:
+            logger.error(f"Error getting commit context for root cause: {str(e)}")
+            return {"error": str(e)}
+
+    def _correlate_logs_with_commits(self, logs: str, commits: List[Dict]) -> Dict:
+        """Correlate failure logs with recent commits to find likely causes"""
+        correlation = {
+            "likely_culprits": [],
+            "related_files": [],
+            "matching_patterns": [],
+        }
+
+        if not logs or not commits:
+            return correlation
+
+        log_lines = logs.lower().split("\n")
+        error_lines = [
+            line
+            for line in log_lines
+            if any(
+                keyword in line for keyword in ["error", "exception", "fail", "crash"]
+            )
+        ]
+
+        for commit in commits:
+            commit_score = 0
+            matching_reasons = []
+
+            # Check if commit message relates to error
+            commit_message = commit.get("message", "").lower()
+            for error_line in error_lines[:5]:  # Check first 5 error lines
+                if any(
+                    word in commit_message
+                    for word in error_line.split()
+                    if len(word) > 3
+                ):
+                    commit_score += 2
+                    matching_reasons.append(
+                        f"Commit message relates to error: {error_line[:50]}..."
+                    )
+
+            # Check if modified files appear in error logs
+            for file_info in commit.get("files", []):
+                filename = file_info.get("filename", "")
+                if filename and filename.lower() in logs.lower():
+                    commit_score += 3
+                    matching_reasons.append(
+                        f"Modified file appears in logs: {filename}"
+                    )
+                    correlation["related_files"].append(filename)
+
+            # Check for risky patterns
+            if file_info.get("risk_level") == "high":
+                commit_score += 2
+                matching_reasons.append("High-risk code changes detected")
+
+            if commit_score > 0:
+                correlation["likely_culprits"].append(
+                    {
+                        "commit": commit,
+                        "confidence_score": min(commit_score * 10, 100),  # Cap at 100%
+                        "reasons": matching_reasons,
+                    }
+                )
+
+        # Sort by confidence score
+        correlation["likely_culprits"].sort(
+            key=lambda x: x["confidence_score"], reverse=True
+        )
+
+        return correlation
+
+    def _assess_overall_risk(self, commit_analysis: Dict) -> Dict:
+        """Assess overall risk level based on commit analysis"""
+        risk_assessment = {"level": "low", "score": 0, "factors": []}
+
+        # Repository commit activity analysis
+        commit_count = commit_analysis.get("total_commits", 0)
+        if commit_count > 50:
+            risk_assessment["score"] += 2
+            risk_assessment["factors"].append(
+                f"Very active repository: {commit_count} commits"
+            )
+        elif commit_count > 20:
+            risk_assessment["score"] += 1
+            risk_assessment["factors"].append(
+                f"Active repository: {commit_count} commits"
+            )
+
+        # Risk indicators from individual commits
+        risk_indicators = commit_analysis.get("risk_indicators", [])
+        risk_assessment["score"] += len(risk_indicators)
+        risk_assessment["factors"].extend(risk_indicators)
+
+        # Urgent/experimental commits
+        patterns = commit_analysis.get("commit_patterns", {})
+        urgent_commits = patterns.get("urgent_commits", 0)
+        experimental_commits = patterns.get("experimental_commits", 0)
+
+        if urgent_commits > 2:
+            risk_assessment["score"] += urgent_commits
+            risk_assessment["factors"].append(
+                f"Multiple urgent/fix commits: {urgent_commits}"
+            )
+
+        if experimental_commits > 1:
+            risk_assessment["score"] += experimental_commits
+            risk_assessment["factors"].append(
+                f"Experimental commits: {experimental_commits}"
+            )
+
+        # Determine risk level
+        if risk_assessment["score"] >= 8:
+            risk_assessment["level"] = "high"
+        elif risk_assessment["score"] >= 4:
+            risk_assessment["level"] = "medium"
+
+        return risk_assessment
+
+    def _suggest_focus_areas(
+        self, commit_analysis: Dict, correlation: Dict
+    ) -> List[str]:
+        """Suggest areas to focus on for debugging"""
+        suggestions = []
+
+        # Focus on likely culprit commits
+        culprits = correlation.get("likely_culprits", [])
+        if culprits:
+            top_culprit = culprits[0]
+            suggestions.append(
+                f"Review commit {top_culprit['commit']['sha']} "
+                f"(confidence: {top_culprit['confidence_score']}%)"
+            )
+
+        # Focus on frequently changed files
+        file_changes = commit_analysis.get("file_changes", {})
+        if file_changes:
+            most_changed = max(file_changes.items(), key=lambda x: x[1])
+            if most_changed[1] > 1:
+                suggestions.append(
+                    f"Focus on {most_changed[0]} (changed {most_changed[1]} times)"
+                )
+
+        # Focus on high-risk changes
+        risk_indicators = commit_analysis.get("risk_indicators", [])
+        high_risk_indicators = [
+            r for r in risk_indicators if "high" in r.lower() or "critical" in r.lower()
+        ]
+        if high_risk_indicators:
+            suggestions.append(
+                "Review high-risk changes: " + "; ".join(high_risk_indicators[:2])
+            )
+
+        # Focus on recent large changes
+        commits = commit_analysis.get("commits", [])
+        large_commits = [c for c in commits if c.get("stats", {}).get("total", 0) > 100]
+        if large_commits:
+            suggestions.append(
+                f"Review large recent commits: {len(large_commits)} commits with >100 lines changed"
+            )
+
+        return suggestions[:5]  # Return top 5 suggestions
+
+    async def _get_full_repository_code(
+        self, full_name: str, max_file_size: int = 50000
+    ) -> Dict:
+        """
+        Fetch the complete repository code for LLM analysis
+        For dissertation purposes with small test repositories
+        """
+        try:
+            if not self.github_client:
+                return {"error": "GitHub client not available"}
+
+            repo = self.github_client.get_repo(full_name)
+
+            # Get default branch
+            default_branch = repo.default_branch
+
+            # Get the repository tree
+            tree = repo.get_git_tree(default_branch, recursive=True)
+
+            codebase = {
+                "repository": full_name,
+                "branch": default_branch,
+                "files": {},
+                "structure": [],
+                "total_files": 0,
+                "total_size": 0,
+            }
+
+            # Filter to code files only
+            code_extensions = {
+                ".py",
+                ".js",
+                ".ts",
+                ".jsx",
+                ".tsx",
+                ".java",
+                ".go",
+                ".cpp",
+                ".c",
+                ".rs",
+                ".rb",
+                ".php",
+                ".cs",
+                ".sql",
+                ".yaml",
+                ".yml",
+                ".json",
+                ".xml",
+                ".html",
+                ".css",
+                ".scss",
+                ".sh",
+                ".dockerfile",
+                ".md",
+                ".txt",
+                ".env",
+                ".gitignore",
+                ".toml",
+                ".ini",
+                ".cfg",
+                ".conf",
+            }
+
+            # Collect file information
+            code_files = []
+            for element in tree.tree:
+                if element.type == "blob":  # It's a file
+                    file_path = element.path
+                    file_ext = (
+                        "." + file_path.split(".")[-1].lower()
+                        if "." in file_path
+                        else ""
+                    )
+
+                    # Include code files and configuration files
+                    if file_ext in code_extensions or any(
+                        name in file_path.lower()
+                        for name in ["makefile", "dockerfile", "readme", "license"]
+                    ):
+
+                        code_files.append(
+                            {
+                                "path": file_path,
+                                "sha": element.sha,
+                                "size": element.size,
+                                "extension": file_ext,
+                            }
+                        )
+
+            # Sort by importance (critical files first)
+            code_files.sort(
+                key=lambda f: self._get_file_importance_score(f["path"]), reverse=True
+            )
+
+            # Fetch content for files (with size limits for LLM)
+            total_content_size = 0
+            max_total_size = 200000  # 200KB total limit for LLM context
+
+            for file_info in code_files:
+                if total_content_size >= max_total_size:
+                    break
+
+                if file_info["size"] > max_file_size:
+                    # For large files, just show structure
+                    codebase["files"][file_info["path"]] = {
+                        "content": f"[File too large: {file_info['size']} bytes]",
+                        "size": file_info["size"],
+                        "extension": file_info["extension"],
+                        "truncated": True,
+                    }
+                    continue
+
+                try:
+                    # Fetch file content
+                    file_content = repo.get_contents(file_info["path"])
+
+                    if file_content.content:
+                        decoded_content = file_content.decoded_content.decode(
+                            "utf-8", errors="ignore"
+                        )
+
+                        # Add to total size check
+                        if total_content_size + len(decoded_content) > max_total_size:
+                            # Truncate if it would exceed limit
+                            remaining_space = max_total_size - total_content_size
+                            decoded_content = (
+                                decoded_content[:remaining_space] + "\n[TRUNCATED]"
+                            )
+
+                        codebase["files"][file_info["path"]] = {
+                            "content": decoded_content,
+                            "size": file_info["size"],
+                            "extension": file_info["extension"],
+                            "truncated": False,
+                        }
+
+                        total_content_size += len(decoded_content)
+                        codebase["total_files"] += 1
+
+                except Exception as e:
+                    logger.warning(
+                        f"Could not fetch content for {file_info['path']}: {e}"
+                    )
+                    codebase["files"][file_info["path"]] = {
+                        "content": f"[Error reading file: {str(e)}]",
+                        "size": file_info["size"],
+                        "extension": file_info["extension"],
+                        "error": str(e),
+                    }
+
+            # Create directory structure
+            codebase["structure"] = self._build_directory_structure(
+                codebase["files"].keys()
+            )
+            codebase["total_size"] = total_content_size
+
+            logger.info(
+                f"Fetched {codebase['total_files']} files ({total_content_size} bytes) from {full_name}"
+            )
+
+            return codebase
+
+        except Exception as e:
+            logger.error(f"Error fetching full repository code: {str(e)}")
+            return {"error": str(e)}
+
+    def _get_file_importance_score(self, file_path: str) -> int:
+        """Score files by importance for root cause analysis"""
+        score = 0
+
+        # Critical configuration files
+        if any(
+            name in file_path.lower()
+            for name in [
+                "package.json",
+                "requirements.txt",
+                "pom.xml",
+                "build.gradle",
+                "dockerfile",
+                "docker-compose",
+                "makefile",
+                ".env",
+                "config",
+            ]
+        ):
+            score += 100
+
+        # Main application files
+        if any(
+            name in file_path.lower()
+            for name in ["main.", "app.", "server.", "index.", "__init__.py"]
+        ):
+            score += 80
+
+        # Test files
+        if any(name in file_path.lower() for name in ["test", "spec"]):
+            score += 60
+
+        # Source code files
+        code_extensions = [".py", ".js", ".ts", ".java", ".go", ".cpp", ".c", ".rs"]
+        if any(file_path.endswith(ext) for ext in code_extensions):
+            score += 40
+
+        # CI/CD files
+        if any(
+            name in file_path.lower() for name in [".github", ".gitlab", "ci", "cd"]
+        ):
+            score += 30
+
+        # Documentation
+        if any(name in file_path.lower() for name in ["readme", "doc"]):
+            score += 20
+
+        return score
+
+    def _build_directory_structure(self, file_paths) -> List[str]:
+        """Build a simple directory structure representation"""
+        directories = set()
+
+        for path in file_paths:
+            parts = path.split("/")
+            for i in range(len(parts)):
+                dir_path = "/".join(parts[: i + 1])
+                directories.add(dir_path)
+
+        return sorted(list(directories))
+
+
+# Global instance
+github_service = GitHubService()

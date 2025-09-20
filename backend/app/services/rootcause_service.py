@@ -6,6 +6,8 @@ import logging
 from app.db.database import get_supabase, get_service_client, exec_query
 from app.services.metrics_service import MetricsService
 from app.services.llm_interface import get_llm_service, LLMMessage
+from app.services.similarity_service import SimilarityService
+from app.services.github_service import github_service
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,7 @@ class RootCauseService:
     """
 
     def __init__(self):
+        self.similarity_service = SimilarityService()
         self.analysis_patterns = [
             {
                 "pattern": ["timeout", "connection", "database", "db"],
@@ -150,29 +153,79 @@ class RootCauseService:
         return best_match if best_score > 0 else None
 
     async def _get_similar_resolved_tickets(
-        self, keywords: List[str], limit: int = 3
+        self, ticket_text: str, ticket_id: UUID, limit: int = 3, client=None
     ) -> List[Dict[str, Any]]:
-        """Find similar resolved tickets for reference"""
+        """Find similar resolved tickets using BERT embeddings"""
         try:
-            c = self._c()
-
-            # Simple keyword-based search in resolved tickets
-            search_terms = " | ".join(keywords[:5])  # Use top 5 keywords
-
-            query = (
-                c.table("tickets")
-                .select("id, title, description, status, created_at")
-                .in_("status", ["resolved", "closed"])
-                .text_search("search_tsv", search_terms)
+            # Use similarity service to find semantically similar tickets
+            similar_tickets = await self.similarity_service.find_similar_tickets(
+                ticket_text=ticket_text,
+                current_ticket_id=ticket_id,
+                limit=limit * 3,  # Get more to filter for resolved ones
+                user_id=None,  # System operation
+                client=client
             )
 
-            resp = exec_query(query)
-            data = resp.data or []
-            return data[:limit]  # Apply limit after query
+            # Filter for only resolved/closed tickets
+            resolved_tickets = [
+                ticket for ticket in similar_tickets
+                if ticket.get("status") in ["resolved", "closed"]
+            ]
+
+            return resolved_tickets[:limit]
 
         except Exception as e:
             logger.error(f"Error finding similar resolved tickets: {str(e)}")
             return []
+
+    async def _get_commit_context_if_applicable(self, ticket: Dict, client) -> Dict:
+        """Get commit context if this ticket is related to a CI failure"""
+        try:
+            # Check if this ticket is linked to a CI failure
+            ci_failure_resp = exec_query(
+                client.table("ci_failures")
+                .select("*, github_repositories(full_name)")
+                .eq("ticket_id", ticket["id"])
+                .single()
+            )
+
+            if not ci_failure_resp.data:
+                return {"available": False}
+
+            ci_failure = ci_failure_resp.data
+            repo_full_name = ci_failure.get("github_repositories", {}).get("full_name")
+            failure_time = ci_failure.get("created_at")
+
+            if not repo_full_name or not failure_time:
+                return {"available": False}
+
+            # Parse failure time
+            from datetime import datetime
+            failure_datetime = datetime.fromisoformat(failure_time.replace('Z', '+00:00'))
+
+            # Get comprehensive commit context
+            commit_context = await github_service.get_commit_context_for_rootcause(
+                full_name=repo_full_name,
+                failure_time=failure_datetime,
+                failure_logs=ci_failure.get("logs", "")
+            )
+
+            # Add CI failure context
+            commit_context.update({
+                "available": True,
+                "ci_failure": {
+                    "workflow": ci_failure.get("workflow_name"),
+                    "commit_sha": ci_failure.get("commit_sha"),
+                    "branch": ci_failure.get("branch_name"),
+                    "failure_reason": ci_failure.get("failure_reason")
+                }
+            })
+
+            return commit_context
+
+        except Exception as e:
+            logger.warning(f"Could not get commit context: {str(e)}")
+            return {"available": False, "error": str(e)}
 
     async def analyze_ticket(
         self,
@@ -223,17 +276,22 @@ class RootCauseService:
             text_content = f"{ticket['title']} {ticket.get('description', '')}"
             keywords = self._extract_keywords(text_content)
 
-            # Get similar resolved tickets for context
-            similar_tickets = await self._get_similar_resolved_tickets(keywords)
+            # Get similar resolved tickets using BERT embeddings
+            similar_tickets = await self._get_similar_resolved_tickets(
+                ticket_text=text_content, ticket_id=ticket_id, client=c
+            )
+
+            # Get commit context for enhanced analysis (if this is a CI-created ticket)
+            commit_context = await self._get_commit_context_if_applicable(ticket, c)
 
             analysis = None
             pattern_match = None
 
             if use_llm:
                 try:
-                    # Use LLM for analysis
+                    # Use LLM for analysis with commit context
                     analysis = await self._llm_analyze_ticket(
-                        ticket, recent_comments, similar_tickets
+                        ticket, recent_comments, similar_tickets, commit_context
                     )
                 except Exception as e:
                     logger.warning(
@@ -266,7 +324,7 @@ class RootCauseService:
                     ),
                 }
 
-            # Build final analysis result
+            # Build final analysis result with commit context metadata
             final_analysis = {
                 "ticket_id": str(ticket_id),
                 "analysis_timestamp": time.time(),
@@ -280,6 +338,8 @@ class RootCauseService:
                 "keywords_analyzed": keywords[:10],
                 "analysis_method": analysis.get("analysis_method", "llm"),
                 "llm_used": analysis.get("analysis_method") == "llm",
+                "commit_context_used": commit_context and commit_context.get("available", False),
+                "commit_analysis_summary": self._summarize_commit_context(commit_context) if commit_context and commit_context.get("available") else None
             }
 
             # Log metrics
@@ -321,10 +381,11 @@ class RootCauseService:
         ticket: Dict[str, Any],
         recent_comments: List[Dict[str, Any]],
         similar_tickets: List[Dict[str, Any]],
+        commit_context: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
         """Use LLM to analyze ticket and provide root cause analysis"""
 
-        # Build context for LLM
+        # Build comprehensive context for LLM including commit analysis
         context_parts = [
             f"Title: {ticket['title']}",
             f"Description: {ticket.get('description', 'No description provided')}",
@@ -332,20 +393,153 @@ class RootCauseService:
             f"Team: {ticket.get('teams', {}).get('name', 'unknown') if ticket.get('teams') else 'unknown'}",
         ]
 
+        # Add commit context if available (this is the key enhancement for Question 2)
+        if commit_context and commit_context.get("available"):
+            context_parts.append("\n=== CODE ANALYSIS ===")
+
+            # Repository context
+            repo_info = commit_context.get("repository", {})
+            context_parts.append(f"Repository: {repo_info.get('name', 'unknown')}")
+            context_parts.append(f"Primary Language: {repo_info.get('language', 'unknown')}")
+            context_parts.append(f"Tech Stack: {', '.join(repo_info.get('tech_stack', []))}")
+
+            # CI failure context
+            ci_info = commit_context.get("ci_failure", {})
+            if ci_info:
+                context_parts.append(f"\nCI Failure Details:")
+                context_parts.append(f"- Workflow: {ci_info.get('workflow', 'unknown')}")
+                context_parts.append(f"- Commit SHA: {ci_info.get('commit_sha', 'unknown')}")
+                context_parts.append(f"- Branch: {ci_info.get('branch', 'unknown')}")
+                context_parts.append(f"- Failure Reason: {ci_info.get('failure_reason', 'unknown')}")
+
+            # Commit analysis (the core of the enhancement)
+            commit_analysis = commit_context.get("commit_analysis", {})
+            if commit_analysis and not commit_analysis.get("error"):
+                context_parts.append(f"\nComplete Repository Commit Analysis:")
+                context_parts.append(f"- Total commits analyzed: {commit_analysis.get('total_commits', 0)}")
+
+                # Risk indicators
+                risk_indicators = commit_analysis.get("risk_indicators", [])
+                if risk_indicators:
+                    context_parts.append("- Risk Indicators:")
+                    for risk in risk_indicators[:3]:  # Top 3 risks
+                        context_parts.append(f"  • {risk}")
+
+                # Latest commits details
+                commits = commit_analysis.get("commits", [])
+                if commits:
+                    context_parts.append("- Latest Commits:")
+                    for commit in commits[:5]:  # First 5 commits (most recent)
+                        context_parts.append(f"  • {commit.get('sha', 'unknown')}: {commit.get('message', 'No message')[:100]}...")
+
+                        # File changes
+                        files = commit.get("files", [])
+                        if files:
+                            high_risk_files = [f for f in files if f.get("risk_level") == "high"]
+                            if high_risk_files:
+                                context_parts.append(f"    High-risk files: {', '.join([f['filename'] for f in high_risk_files[:3]])}")
+
+            # Log correlation (crucial for root cause)
+            correlation = commit_context.get("log_correlation", {})
+            culprits = correlation.get("likely_culprits", [])
+            if culprits:
+                context_parts.append(f"\nLikely Culprit Commits (based on log correlation):")
+                for culprit in culprits[:2]:  # Top 2 suspects
+                    commit = culprit.get("commit", {})
+                    confidence = culprit.get("confidence_score", 0)
+                    reasons = culprit.get("reasons", [])
+                    context_parts.append(f"- {commit.get('sha', 'unknown')} (confidence: {confidence}%)")
+                    context_parts.append(f"  Message: {commit.get('message', 'No message')[:80]}...")
+                    context_parts.append(f"  Reasons: {'; '.join(reasons[:2])}")
+
+            # Risk assessment
+            risk_assessment = commit_context.get("risk_assessment", {})
+            if risk_assessment:
+                context_parts.append(f"\nOverall Risk Assessment: {risk_assessment.get('level', 'unknown')} (score: {risk_assessment.get('score', 0)})")
+
+            # Focus areas suggestions
+            focus_areas = commit_context.get("suggested_focus_areas", [])
+            if focus_areas:
+                context_parts.append(f"\nSuggested Focus Areas:")
+                for area in focus_areas[:3]:
+                    context_parts.append(f"- {area}")
+
+            # Full codebase (for dissertation with small repos)
+            full_codebase = commit_context.get("full_codebase")
+            if full_codebase and not full_codebase.get("error"):
+                context_parts.append(f"\n=== COMPLETE REPOSITORY CODE ===")
+                context_parts.append(f"Repository: {full_codebase.get('repository', 'unknown')}")
+                context_parts.append(f"Branch: {full_codebase.get('branch', 'unknown')}")
+                context_parts.append(f"Total files: {full_codebase.get('total_files', 0)}")
+                context_parts.append(f"Total size: {full_codebase.get('total_size', 0)} bytes")
+
+                # Add directory structure
+                structure = full_codebase.get("structure", [])
+                if structure:
+                    context_parts.append(f"\nDirectory Structure:")
+                    for item in structure[:20]:  # Show first 20 items
+                        context_parts.append(f"  {item}")
+
+                # Add file contents (prioritized by importance)
+                files = full_codebase.get("files", {})
+                if files:
+                    context_parts.append(f"\nFile Contents:")
+                    for file_path, file_info in files.items():
+                        content = file_info.get("content", "")
+                        if content and not content.startswith("["):  # Skip error/truncated messages
+                            context_parts.append(f"\n--- {file_path} ---")
+                            context_parts.append(content)
+                        elif file_info.get("truncated"):
+                            context_parts.append(f"\n--- {file_path} (TRUNCATED) ---")
+
         if recent_comments:
-            context_parts.append("Recent Comments:")
+            context_parts.append("\n=== RECENT COMMENTS ===")
             for comment in recent_comments:
                 context_parts.append(f"- {comment['content'][:200]}...")
 
         if similar_tickets:
-            context_parts.append("Similar Resolved Tickets:")
+            context_parts.append("\n=== SIMILAR RESOLVED TICKETS ===")
             for similar in similar_tickets[:2]:
                 context_parts.append(f"- {similar['title']}")
 
         ticket_context = "\n".join(context_parts)
 
-        # Create LLM prompt
-        system_prompt = """You are a senior software engineer specializing in debugging and root cause analysis.
+        # Create enhanced LLM prompt that leverages commit context
+        has_commit_context = commit_context and commit_context.get("available")
+
+        if has_commit_context:
+            system_prompt = """You are a senior software engineer specializing in debugging and root cause analysis. You have access to comprehensive code analysis including recent commits, file changes, CI failure logs, and the COMPLETE REPOSITORY CODEBASE.
+
+Analyze the provided information and provide:
+1. A concise root cause analysis (1-2 sentences) leveraging commit history, code changes, and actual source code
+2. A confidence score from 0.1 to 1.0 (higher confidence when you can see the exact code causing issues)
+3. 3-5 specific, actionable troubleshooting steps based on the actual codebase
+
+IMPORTANT INSTRUCTIONS:
+- You have access to the COMPLETE REPOSITORY CODE - use this to understand the exact implementation
+- Pay special attention to "Likely Culprit Commits" and cross-reference with the actual code
+- Look for specific bugs, misconfigurations, or issues in the provided source code
+- Consider dependencies, imports, and interactions between files
+- Identify exact lines of code that might be causing issues
+- Use the commit changes in context of the full codebase to understand impact
+- Reference specific files, functions, and code patterns you can see
+- Consider CI/CD configuration files, dependencies, and build processes
+
+Since you can see the entire codebase, you should be able to provide highly specific and accurate root cause analysis.
+
+Respond in JSON format:
+{
+  "root_cause": "Specific description of the exact code issue/bug with file references",
+  "confidence_score": 0.95,
+  "suggestions": [
+    "Fix specific line/function in specific file",
+    "Check specific configuration in specific file",
+    "Investigate specific dependency/import issue",
+    "Update specific test or CI configuration"
+  ]
+}"""
+        else:
+            system_prompt = """You are a senior software engineer specializing in debugging and root cause analysis.
 
 Analyze the provided ticket information and provide:
 1. A concise root cause analysis (1-2 sentences)
@@ -440,6 +634,45 @@ Respond in JSON format:
             user_rating=rating,
             metadata={"feedback_text": feedback_text} if feedback_text else None,
         )
+
+    def _summarize_commit_context(self, commit_context: Dict) -> Dict:
+        """Summarize commit context for metadata"""
+        if not commit_context or not commit_context.get("available"):
+            return None
+
+        summary = {}
+
+        # Repository info
+        repo_info = commit_context.get("repository", {})
+        summary["repository"] = repo_info.get("name", "unknown")
+        summary["language"] = repo_info.get("language", "unknown")
+
+        # Commit analysis summary
+        commit_analysis = commit_context.get("commit_analysis", {})
+        if commit_analysis:
+            summary["total_commits"] = commit_analysis.get("total_commits", 0)
+            summary["risk_indicators_count"] = len(commit_analysis.get("risk_indicators", []))
+
+        # Correlation summary
+        correlation = commit_context.get("log_correlation", {})
+        culprits = correlation.get("likely_culprits", [])
+        if culprits:
+            summary["likely_culprits_count"] = len(culprits)
+            summary["top_culprit_confidence"] = culprits[0].get("confidence_score", 0)
+
+        # Risk assessment
+        risk_assessment = commit_context.get("risk_assessment", {})
+        summary["risk_level"] = risk_assessment.get("level", "unknown")
+        summary["risk_score"] = risk_assessment.get("score", 0)
+
+        # Full codebase usage
+        full_codebase = commit_context.get("full_codebase")
+        summary["full_codebase_used"] = bool(full_codebase and not full_codebase.get("error"))
+        if summary["full_codebase_used"]:
+            summary["codebase_files_count"] = full_codebase.get("total_files", 0)
+            summary["codebase_size_bytes"] = full_codebase.get("total_size", 0)
+
+        return summary
 
 
 # Global instance

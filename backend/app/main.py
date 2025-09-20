@@ -6,6 +6,7 @@ import logging
 from app.config import settings
 from app.db.database import init_supabase
 from app.api.routes import auth, tickets, comments, tags, teams, github, metrics, ai_chat
+from app.api import evaluation
 from app.services.llm_interface import (
     initialize_llm_service, OpenAIProvider, AnthropicProvider, MockLLMProvider
 )
@@ -81,3 +82,4 @@ app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
 app.include_router(github.router, prefix="/api", tags=["github"])
 app.include_router(metrics.router, prefix="/api/metrics", tags=["metrics"])
 app.include_router(ai_chat.router, prefix="/api/ai-chat", tags=["ai-chat"])
+app.include_router(evaluation.router, prefix="/api", tags=["evaluation"])

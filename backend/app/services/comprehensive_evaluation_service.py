@@ -180,7 +180,7 @@ class ComprehensiveEvaluationService:
                 ticket = await TicketService.create_ticket(ticket_payload, actor_id, client=c)
 
                 created_tickets.append(ticket.id)
-                group_tickets.append(ticket.id)
+                group_tickets.append(str(ticket.id))
 
             similar_groups[f"group_{group_idx}"] = group_tickets
 
@@ -193,7 +193,17 @@ class ComprehensiveEvaluationService:
                 "error_code": f"error_{random.randint(1000, 9999)}",
                 "cause": f"unknown issue {random.randint(1, 100)}",
                 "timeout": f"{random.randint(1000, 60000)}",
-                "impact": f"functionality {random.randint(1, 20)}"
+                "impact": f"functionality {random.randint(1, 20)}",
+                "start_size": f"{random.randint(100, 500)}MB",
+                "end_size": f"{random.randint(1000, 5000)}MB",
+                "duration": random.choice(["2 hours", "6 hours", "1 day"]),
+                "location": random.choice(["event listeners", "cache manager", "session handler"]),
+                "status_code": random.choice(["404", "500", "502", "503"]),
+                "endpoint": random.choice(["/api/users", "/api/payments", "/api/auth", "/api/data"]),
+                "operations": random.choice(["user creation", "data retrieval", "file upload", "authentication"]),
+                "condition": random.choice(["high load", "invalid input", "missing headers", "rate limiting"]),
+                "browser": random.choice(["Chrome", "Firefox", "Safari", "Edge"]),
+                "user_group": random.choice(["mobile", "desktop", "admin", "premium"])
             }
 
             title = template["title_template"].format(**variations) + f" - Random {i}"
@@ -264,7 +274,7 @@ class ComprehensiveEvaluationService:
             "tickets_created": len(created_tickets),
             "similar_groups": similar_groups,
             "commit_failure_tickets": commit_failure_tickets,
-            "ticket_ids": created_tickets
+            "ticket_ids": [str(tid) for tid in created_tickets]
         }
 
     async def evaluate_similarity_accuracy(
@@ -483,35 +493,44 @@ class ComprehensiveEvaluationService:
         # Calculate correlation and accuracy metrics
         if len(ai_ratings) >= 2:  # Need at least 2 data points for correlation
             import numpy as np
-            correlation = np.corrcoef(ai_ratings, human_rating_values)[0, 1]
+
+            # Calculate correlation with NaN handling
+            try:
+                correlation_matrix = np.corrcoef(ai_ratings, human_rating_values)
+                correlation = correlation_matrix[0, 1]
+                # Handle NaN values (occurs when one array has no variance)
+                if np.isnan(correlation) or np.isinf(correlation):
+                    correlation = 0.0
+            except:
+                correlation = 0.0
 
             # Calculate Mean Absolute Error
-            mae = np.mean(np.abs(np.array(ai_ratings) - np.array(human_rating_values)))
+            mae = float(np.mean(np.abs(np.array(ai_ratings) - np.array(human_rating_values))))
 
             # Calculate accuracy (percentage within 1 point)
             within_1_point = sum(1 for ai, human in zip(ai_ratings, human_rating_values) if abs(ai - human) <= 1)
             accuracy_within_1 = within_1_point / len(ai_ratings)
 
             # Average ratings
-            avg_ai_rating = np.mean(ai_ratings)
-            avg_human_rating = np.mean(human_rating_values)
+            avg_ai_rating = float(np.mean(ai_ratings))
+            avg_human_rating = float(np.mean(human_rating_values))
         else:
-            correlation = 0
-            mae = 0
-            accuracy_within_1 = 0
-            avg_ai_rating = 0
-            avg_human_rating = 0
+            correlation = 0.0
+            mae = 0.0
+            accuracy_within_1 = 0.0
+            avg_ai_rating = 0.0
+            avg_human_rating = 0.0
 
-        # Log evaluation metrics
+        # Log evaluation metrics (ensure all values are JSON serializable)
         await MetricsService.log_event(
             event_type="rootcause_evaluation_completed",
             ai_feature="rootcause",
             metadata={
                 "test_tickets_count": len(test_tickets),
-                "with_commit_context": test_with_commit_context,
-                "correlation": correlation,
-                "mae": mae,
-                "accuracy_within_1": accuracy_within_1
+                "with_commit_context": bool(test_with_commit_context),
+                "correlation": float(correlation),
+                "mae": float(mae),
+                "accuracy_within_1": float(accuracy_within_1)
             },
             response_time_ms=int((time.time() - start_time) * 1000),
             client=c
@@ -525,11 +544,11 @@ class ComprehensiveEvaluationService:
             evaluation_id=evaluation_id,
             evaluation_type="rootcause_accuracy",
             metrics={
-                "correlation": correlation,
-                "mae": mae,
-                "accuracy_within_1": accuracy_within_1,
-                "avg_ai_rating": avg_ai_rating,
-                "avg_human_rating": avg_human_rating,
+                "correlation": float(correlation),
+                "mae": float(mae),
+                "accuracy_within_1": float(accuracy_within_1),
+                "avg_ai_rating": float(avg_ai_rating),
+                "avg_human_rating": float(avg_human_rating),
                 "total_evaluations": len(ai_ratings)
             },
             detailed_results={

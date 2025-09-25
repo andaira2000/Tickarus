@@ -1,0 +1,46 @@
+# buildspec.yml
+version: 0.2
+
+env:
+  variables:
+    IMAGE_TAG: "latest"
+
+phases:
+  pre_build:
+    commands:
+      - echo "Region: $AWS_DEFAULT_REGION, Account: $ACCOUNT_ID"
+      - REPO_URI=$ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$ECR_REPOSITORY
+      - echo "Logging in to ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+  build:
+    commands:
+      - echo "Building image..."
+      - docker build -t $REPO_URI:$IMAGE_TAG .
+      - docker tag $REPO_URI:$IMAGE_TAG $REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
+  post_build:
+    commands:
+      - echo "Pushing image..."
+      - docker push $REPO_URI:$IMAGE_TAG
+      - docker push $REPO_URI:$CODEBUILD_RESOLVED_SOURCE_VERSION
+      - echo "Deploying to Lambda..."
+      # Try update; if fails (no function yet), create it:
+      - |
+        set -e
+        IMAGE_URI="$REPO_URI:$IMAGE_TAG"
+        echo "Using IMAGE_URI=$IMAGE_URI"
+        if aws lambda get-function --function-name "$LAMBDA_FUNCTION_NAME" >/dev/null 2>&1; then
+          aws lambda update-function-code --function-name "$LAMBDA_FUNCTION_NAME" --image-uri "$IMAGE_URI" >/dev/null
+          echo "Updated existing Lambda function."
+        else
+          aws lambda create-function \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --package-type Image \
+            --code ImageUri="$IMAGE_URI" \
+            --role "$LAMBDA_EXEC_ROLE_ARN" \
+            --timeout 45 \
+            --memory-size 8192 \
+            --architectures x86_64 >/dev/null
+          echo "Created new Lambda function."
+        fi
+artifacts:
+  files: []

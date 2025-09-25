@@ -1,0 +1,21 @@
+name: Deploy to Lambda (via CodeBuild)
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::762233758504:role/GitHubActionsRole
+          aws-region: eu-north-1
+
+      - name: Start CodeBuild
+        run: aws codebuild start-build --project-name my-fastapi-codebuild-project

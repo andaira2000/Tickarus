@@ -30,17 +30,19 @@ phases:
       - |
         IMAGE_URI="${REPO_URI}:${IMAGE_TAG}"
         echo "Using IMAGE_URI=${IMAGE_URI}"
+        echo "Usin LAMBDA_EXEC_ROLE_ARN=${LAMBDA_EXEC_ROLE_ARN}"
         if aws lambda get-function --function-name "${LAMBDA_FUNCTION_NAME}" >/dev/null 2>&1; then
           aws lambda update-function-code --function-name "${LAMBDA_FUNCTION_NAME}" --image-uri "${IMAGE_URI}" >/dev/null
           echo "Updated existing Lambda function."
         else
           aws lambda create-function \
+            --region eu-north-1 \
             --function-name "${LAMBDA_FUNCTION_NAME}" \
             --package-type Image \
             --code ImageUri="${IMAGE_URI}" \
             --role "${LAMBDA_EXEC_ROLE_ARN}" \
             --timeout 45 \
-            --memory-size 8192 \
+            --memory-size 3008 \
             --architectures x86_64 >/dev/null
           echo "Created new Lambda function."
         fi

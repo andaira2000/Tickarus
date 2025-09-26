@@ -304,7 +304,10 @@ function TicketsContent() {
                     <div className="w-3 h-3 rounded-full bg-orange-500"></div>
                     <span className="text-sm">High</span>
                   </div>
-                  <Badge variant={myTicketStats.high > 0 ? "destructive" : "secondary"}>
+                  <Badge
+                    variant="outline"
+                    className={myTicketStats.high > 0 ? "bg-orange-500 text-white border-orange-500" : "bg-gray-50 text-gray-500 border-gray-200"}
+                  >
                     {myTicketStats.high}
                   </Badge>
                 </div>

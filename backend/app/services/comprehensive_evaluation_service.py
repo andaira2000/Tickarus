@@ -50,7 +50,7 @@ class ComprehensiveEvaluationService:
         self,
         num_tickets: int = 50,
         num_similar_groups: int = 10,
-        include_commit_failures: bool = True
+        include_commit_failures: bool = True,
     ) -> Dict[str, Any]:
         """Generate synthetic test data for dissertation evaluation"""
         c = get_service_client()
@@ -68,32 +68,32 @@ class ComprehensiveEvaluationService:
                 "title_template": "Login authentication failure in {component}",
                 "description_template": "Users are unable to authenticate when accessing {component}. The login process fails with error code {error_code}. This appears to be related to {cause}.",
                 "tags": ["authentication", "login", "security"],
-                "priority": "high"
+                "priority": "high",
             },
             {
                 "title_template": "Database connection timeout in {component}",
                 "description_template": "Application experiencing database timeouts in {component} module. Connection pool exhausted after {timeout}ms. Impact on {impact}.",
                 "tags": ["database", "performance", "timeout"],
-                "priority": "high"
+                "priority": "high",
             },
             {
                 "title_template": "Memory leak detected in {component}",
                 "description_template": "Memory usage continuously increasing in {component}. Heap size grows from {start_size} to {end_size} over {duration}. Potential leak in {location}.",
                 "tags": ["memory", "performance", "leak"],
-                "priority": "medium"
+                "priority": "medium",
             },
             {
                 "title_template": "API endpoint returning {status_code} error",
                 "description_template": "The {endpoint} endpoint is returning {status_code} errors. Affected operations: {operations}. Error occurs when {condition}.",
                 "tags": ["api", "http", "error"],
-                "priority": "high"
+                "priority": "high",
             },
             {
                 "title_template": "UI component not rendering properly",
                 "description_template": "The {component} component fails to render in {browser}. CSS styles not applying correctly. Affects {user_group} users.",
                 "tags": ["ui", "frontend", "rendering"],
-                "priority": "medium"
-            }
+                "priority": "medium",
+            },
         ]
 
         # Get actors for creating tickets (prefer human, fallback to system)
@@ -111,16 +111,15 @@ class ComprehensiveEvaluationService:
                 .select("id, actor_type")
                 .eq("actor_type", "system")
                 .limit(5)
-            ).data
+            ).data2
 
         if not test_actors:
-            raise Exception("No actors found for test data generation. Please create at least one user account first.")
+            raise Exception(
+                "No actors found for test data generation. Please create at least one user account first."
+            )
 
         # Get all existing teams to randomly distribute tickets
-        teams_resp = exec_query(
-            c.table("teams")
-            .select("id")
-        )
+        teams_resp = exec_query(c.table("teams").select("id"))
 
         if not teams_resp.data:
             raise Exception("No teams found. Please create at least one team first.")
@@ -143,21 +142,65 @@ class ComprehensiveEvaluationService:
             for i in range(tickets_in_group):
                 # Generate variations of the template
                 variations = {
-                    "component": random.choice(["auth-service", "user-service", "payment-api", "dashboard", "mobile-app"]),
-                    "error_code": random.choice(["401", "500", "503", "timeout", "connection_failed"]),
-                    "cause": random.choice(["server overload", "network issues", "configuration error", "dependency failure"]),
+                    "component": random.choice(
+                        [
+                            "auth-service",
+                            "user-service",
+                            "payment-api",
+                            "dashboard",
+                            "mobile-app",
+                        ]
+                    ),
+                    "error_code": random.choice(
+                        ["401", "500", "503", "timeout", "connection_failed"]
+                    ),
+                    "cause": random.choice(
+                        [
+                            "server overload",
+                            "network issues",
+                            "configuration error",
+                            "dependency failure",
+                        ]
+                    ),
                     "timeout": random.choice(["5000", "10000", "30000"]),
-                    "impact": random.choice(["user registration", "payment processing", "data sync", "reporting"]),
+                    "impact": random.choice(
+                        [
+                            "user registration",
+                            "payment processing",
+                            "data sync",
+                            "reporting",
+                        ]
+                    ),
                     "start_size": f"{random.randint(100, 500)}MB",
                     "end_size": f"{random.randint(1000, 5000)}MB",
                     "duration": random.choice(["2 hours", "6 hours", "1 day"]),
-                    "location": random.choice(["event listeners", "cache manager", "session handler"]),
+                    "location": random.choice(
+                        ["event listeners", "cache manager", "session handler"]
+                    ),
                     "status_code": random.choice(["404", "500", "502", "503"]),
-                    "endpoint": random.choice(["/api/users", "/api/payments", "/api/auth", "/api/data"]),
-                    "operations": random.choice(["user creation", "data retrieval", "file upload", "authentication"]),
-                    "condition": random.choice(["high load", "invalid input", "missing headers", "rate limiting"]),
+                    "endpoint": random.choice(
+                        ["/api/users", "/api/payments", "/api/auth", "/api/data"]
+                    ),
+                    "operations": random.choice(
+                        [
+                            "user creation",
+                            "data retrieval",
+                            "file upload",
+                            "authentication",
+                        ]
+                    ),
+                    "condition": random.choice(
+                        [
+                            "high load",
+                            "invalid input",
+                            "missing headers",
+                            "rate limiting",
+                        ]
+                    ),
                     "browser": random.choice(["Chrome", "Firefox", "Safari", "Edge"]),
-                    "user_group": random.choice(["mobile", "desktop", "admin", "premium"])
+                    "user_group": random.choice(
+                        ["mobile", "desktop", "admin", "premium"]
+                    ),
                 }
 
                 title = template["title_template"].format(**variations)
@@ -173,11 +216,13 @@ class ComprehensiveEvaluationService:
                     description=description,
                     team_id=get_random_team_id(),
                     priority=template["priority"],
-                    tags=template["tags"] + [f"test-group-{group_idx}"]
+                    tags=template["tags"] + [f"test-group-{group_idx}"],
                 )
 
                 actor_id = UUID(random.choice(test_actors)["id"])
-                ticket = await TicketService.create_ticket(ticket_payload, actor_id, client=c)
+                ticket = await TicketService.create_ticket(
+                    ticket_payload, actor_id, client=c
+                )
 
                 created_tickets.append(ticket.id)
                 group_tickets.append(str(ticket.id))
@@ -197,28 +242,41 @@ class ComprehensiveEvaluationService:
                 "start_size": f"{random.randint(100, 500)}MB",
                 "end_size": f"{random.randint(1000, 5000)}MB",
                 "duration": random.choice(["2 hours", "6 hours", "1 day"]),
-                "location": random.choice(["event listeners", "cache manager", "session handler"]),
+                "location": random.choice(
+                    ["event listeners", "cache manager", "session handler"]
+                ),
                 "status_code": random.choice(["404", "500", "502", "503"]),
-                "endpoint": random.choice(["/api/users", "/api/payments", "/api/auth", "/api/data"]),
-                "operations": random.choice(["user creation", "data retrieval", "file upload", "authentication"]),
-                "condition": random.choice(["high load", "invalid input", "missing headers", "rate limiting"]),
+                "endpoint": random.choice(
+                    ["/api/users", "/api/payments", "/api/auth", "/api/data"]
+                ),
+                "operations": random.choice(
+                    ["user creation", "data retrieval", "file upload", "authentication"]
+                ),
+                "condition": random.choice(
+                    ["high load", "invalid input", "missing headers", "rate limiting"]
+                ),
                 "browser": random.choice(["Chrome", "Firefox", "Safari", "Edge"]),
-                "user_group": random.choice(["mobile", "desktop", "admin", "premium"])
+                "user_group": random.choice(["mobile", "desktop", "admin", "premium"]),
             }
 
             title = template["title_template"].format(**variations) + f" - Random {i}"
-            description = template["description_template"].format(**variations) + f" This is a random test ticket {i} for evaluation purposes."
+            description = (
+                template["description_template"].format(**variations)
+                + f" This is a random test ticket {i} for evaluation purposes."
+            )
 
             ticket_payload = TicketCreate(
                 title=title,
                 description=description,
                 team_id=get_random_team_id(),
                 priority=random.choice(["low", "medium", "high"]),
-                tags=template["tags"] + ["random-test"]
+                tags=template["tags"] + ["random-test"],
             )
 
             actor_id = UUID(random.choice(test_actors)["id"])
-            ticket = await TicketService.create_ticket(ticket_payload, actor_id, client=c)
+            ticket = await TicketService.create_ticket(
+                ticket_payload, actor_id, client=c
+            )
             created_tickets.append(ticket.id)
 
         # Generate commit failure tickets if requested
@@ -241,10 +299,12 @@ class ComprehensiveEvaluationService:
                         description=f"Build failed in repository test-repo-{i+1}. Error: {random.choice(['compilation error', 'test failure', 'linting error', 'dependency issue'])}. Branch: {random.choice(['main', 'develop', 'feature/test'])}",
                         team_id=get_random_team_id(),
                         priority="high",
-                        tags=["ci", "build-failure", "automated"]
+                        tags=["ci", "build-failure", "automated"],
                     )
 
-                    ticket = await TicketService.create_ticket(ticket_payload, ci_actor_id, client=c)
+                    ticket = await TicketService.create_ticket(
+                        ticket_payload, ci_actor_id, client=c
+                    )
                     created_tickets.append(ticket.id)
                     commit_failure_tickets += 1
 
@@ -256,17 +316,19 @@ class ComprehensiveEvaluationService:
             "num_tickets": len(created_tickets),
             "similar_groups": similar_groups,
             "commit_failure_tickets": commit_failure_tickets,
-            "ticket_ids": [str(tid) for tid in created_tickets]
+            "ticket_ids": [str(tid) for tid in created_tickets],
         }
 
         # Store in database for future reference
         exec_query(
-            c.table("evaluation_datasets").insert({
-                "id": str(dataset_id),
-                "dataset_type": "comprehensive_test",
-                "metadata": dataset_metadata,
-                "created_at": datetime.utcnow().isoformat()
-            })
+            c.table("evaluation_datasets").insert(
+                {
+                    "id": str(dataset_id),
+                    "dataset_type": "comprehensive_test",
+                    "metadata": dataset_metadata,
+                    "created_at": datetime.utcnow().isoformat(),
+                }
+            )
         )
 
         return {
@@ -274,14 +336,14 @@ class ComprehensiveEvaluationService:
             "tickets_created": len(created_tickets),
             "similar_groups": similar_groups,
             "commit_failure_tickets": commit_failure_tickets,
-            "ticket_ids": [str(tid) for tid in created_tickets]
+            "ticket_ids": [str(tid) for tid in created_tickets],
         }
 
     async def evaluate_similarity_accuracy(
         self,
         test_tickets: List[UUID],
         ground_truth_similar: Dict[UUID, List[UUID]],
-        top_k: int = 3
+        top_k: int = 3,
     ) -> EvaluationResult:
         """
         Evaluate similarity detection accuracy for Question 1:
@@ -326,7 +388,7 @@ class ComprehensiveEvaluationService:
                     current_ticket_id=ticket_id,
                     limit=top_k,
                     user_id=None,
-                    client=c
+                    client=c,
                 )
 
                 # Extract predicted similar ticket IDs
@@ -343,27 +405,40 @@ class ComprehensiveEvaluationService:
                 ticket_precision = hits / len(predicted_ids) if predicted_ids else 0
                 ticket_recall = hits / len(ground_truth_ids) if ground_truth_ids else 0
 
-                individual_results.append({
-                    "ticket_id": str(ticket_id),
-                    "predicted_similar": [str(tid) for tid in predicted_ids],
-                    "ground_truth_similar": [str(tid) for tid in ground_truth_ids],
-                    "hits": hits,
-                    "precision": ticket_precision,
-                    "recall": ticket_recall,
-                    "accuracy_at_k": 1 if hits > 0 else 0  # Hit rate at k
-                })
+                individual_results.append(
+                    {
+                        "ticket_id": str(ticket_id),
+                        "predicted_similar": [str(tid) for tid in predicted_ids],
+                        "ground_truth_similar": [str(tid) for tid in ground_truth_ids],
+                        "hits": hits,
+                        "precision": ticket_precision,
+                        "recall": ticket_recall,
+                        "accuracy_at_k": 1 if hits > 0 else 0,  # Hit rate at k
+                    }
+                )
 
             except Exception as e:
-                logger.error(f"Error evaluating similarity for ticket {ticket_id}: {str(e)}")
+                logger.error(
+                    f"Error evaluating similarity for ticket {ticket_id}: {str(e)}"
+                )
                 continue
 
         # Calculate overall metrics
         precision = total_hits / total_predicted if total_predicted > 0 else 0
         recall = total_hits / total_relevant if total_relevant > 0 else 0
-        f1_score = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+        f1_score = (
+            (2 * precision * recall) / (precision + recall)
+            if (precision + recall) > 0
+            else 0
+        )
 
         # Accuracy at K (how often we find at least one relevant item in top-k)
-        accuracy_at_k = sum(r["accuracy_at_k"] for r in individual_results) / len(individual_results) if individual_results else 0
+        accuracy_at_k = (
+            sum(r["accuracy_at_k"] for r in individual_results)
+            / len(individual_results)
+            if individual_results
+            else 0
+        )
 
         # Log evaluation metrics
         await MetricsService.log_event(
@@ -375,14 +450,15 @@ class ComprehensiveEvaluationService:
                 "precision": precision,
                 "recall": recall,
                 "f1_score": f1_score,
-                "accuracy_at_k": accuracy_at_k
+                "accuracy_at_k": accuracy_at_k,
             },
             response_time_ms=int((time.time() - start_time) * 1000),
-            client=c
+            client=c,
         )
 
         # Create evaluation result
         from uuid import uuid4
+
         evaluation_id = uuid4()
 
         result = EvaluationResult(
@@ -395,29 +471,31 @@ class ComprehensiveEvaluationService:
                 "accuracy_at_k": accuracy_at_k,
                 "total_hits": total_hits,
                 "total_predicted": total_predicted,
-                "total_relevant": total_relevant
+                "total_relevant": total_relevant,
             },
             detailed_results={
                 "individual_results": individual_results,
                 "test_parameters": {
                     "top_k": top_k,
-                    "test_tickets_count": len(test_tickets)
-                }
+                    "test_tickets_count": len(test_tickets),
+                },
             },
             summary=f"Similarity evaluation: {accuracy_at_k:.1%} accuracy at top-{top_k}, F1: {f1_score:.3f}",
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         )
 
         # Store result in database
         exec_query(
-            c.table("evaluation_results").insert({
-                "id": str(evaluation_id),
-                "evaluation_type": "similarity_accuracy",
-                "metrics": result.metrics,
-                "detailed_results": result.detailed_results,
-                "summary": result.summary,
-                "created_at": result.timestamp.isoformat()
-            })
+            c.table("evaluation_results").insert(
+                {
+                    "id": str(evaluation_id),
+                    "evaluation_type": "similarity_accuracy",
+                    "metrics": result.metrics,
+                    "detailed_results": result.detailed_results,
+                    "summary": result.summary,
+                    "created_at": result.timestamp.isoformat(),
+                }
+            )
         )
 
         return result
@@ -426,7 +504,7 @@ class ComprehensiveEvaluationService:
         self,
         test_tickets: List[UUID],
         human_ratings: Dict[UUID, int],  # Human rating 1-5 scale
-        test_with_commit_context: bool = True
+        test_with_commit_context: bool = True,
     ) -> EvaluationResult:
         """
         Evaluate root cause analysis accuracy for Question 2:
@@ -452,22 +530,20 @@ class ComprehensiveEvaluationService:
                 # Perform AI root cause analysis
                 if test_with_commit_context:
                     analysis = await rootcause_service.analyze_ticket(
-                        ticket_id=ticket_id,
-                        user_id=None,
-                        client=c
+                        ticket_id=ticket_id, user_id=None, client=c
                     )
                 else:
                     # Disable commit context for this analysis
                     # (would need to modify rootcause_service for this)
                     analysis = await rootcause_service.analyze_ticket(
-                        ticket_id=ticket_id,
-                        user_id=None,
-                        client=c
+                        ticket_id=ticket_id, user_id=None, client=c
                     )
 
                 # Map AI confidence to 1-5 scale
                 ai_confidence = analysis.get("confidence_score", 0)
-                ai_rating = min(5, max(1, round(ai_confidence * 5)))  # Convert 0-1 to 1-5
+                ai_rating = min(
+                    5, max(1, round(ai_confidence * 5))
+                )  # Convert 0-1 to 1-5
 
                 human_rating = human_ratings.get(ticket_id, 0)
 
@@ -475,19 +551,25 @@ class ComprehensiveEvaluationService:
                     ai_ratings.append(ai_rating)
                     human_rating_values.append(human_rating)
 
-                    individual_results.append({
-                        "ticket_id": str(ticket_id),
-                        "ai_confidence": ai_confidence,
-                        "ai_rating": ai_rating,
-                        "human_rating": human_rating,
-                        "root_cause": analysis.get("root_cause", ""),
-                        "suggestions_count": len(analysis.get("suggestions", [])),
-                        "llm_used": analysis.get("llm_used", False),
-                        "analysis_method": analysis.get("analysis_method", "unknown")
-                    })
+                    individual_results.append(
+                        {
+                            "ticket_id": str(ticket_id),
+                            "ai_confidence": ai_confidence,
+                            "ai_rating": ai_rating,
+                            "human_rating": human_rating,
+                            "root_cause": analysis.get("root_cause", ""),
+                            "suggestions_count": len(analysis.get("suggestions", [])),
+                            "llm_used": analysis.get("llm_used", False),
+                            "analysis_method": analysis.get(
+                                "analysis_method", "unknown"
+                            ),
+                        }
+                    )
 
             except Exception as e:
-                logger.error(f"Error evaluating root cause for ticket {ticket_id}: {str(e)}")
+                logger.error(
+                    f"Error evaluating root cause for ticket {ticket_id}: {str(e)}"
+                )
                 continue
 
         # Calculate correlation and accuracy metrics
@@ -505,10 +587,16 @@ class ComprehensiveEvaluationService:
                 correlation = 0.0
 
             # Calculate Mean Absolute Error
-            mae = float(np.mean(np.abs(np.array(ai_ratings) - np.array(human_rating_values))))
+            mae = float(
+                np.mean(np.abs(np.array(ai_ratings) - np.array(human_rating_values)))
+            )
 
             # Calculate accuracy (percentage within 1 point)
-            within_1_point = sum(1 for ai, human in zip(ai_ratings, human_rating_values) if abs(ai - human) <= 1)
+            within_1_point = sum(
+                1
+                for ai, human in zip(ai_ratings, human_rating_values)
+                if abs(ai - human) <= 1
+            )
             accuracy_within_1 = within_1_point / len(ai_ratings)
 
             # Average ratings
@@ -530,14 +618,15 @@ class ComprehensiveEvaluationService:
                 "with_commit_context": bool(test_with_commit_context),
                 "correlation": float(correlation),
                 "mae": float(mae),
-                "accuracy_within_1": float(accuracy_within_1)
+                "accuracy_within_1": float(accuracy_within_1),
             },
             response_time_ms=int((time.time() - start_time) * 1000),
-            client=c
+            client=c,
         )
 
         # Create evaluation result
         from uuid import uuid4
+
         evaluation_id = uuid4()
 
         result = EvaluationResult(
@@ -549,30 +638,32 @@ class ComprehensiveEvaluationService:
                 "accuracy_within_1": float(accuracy_within_1),
                 "avg_ai_rating": float(avg_ai_rating),
                 "avg_human_rating": float(avg_human_rating),
-                "total_evaluations": len(ai_ratings)
+                "total_evaluations": len(ai_ratings),
             },
             detailed_results={
                 "individual_results": individual_results,
                 "test_parameters": {
                     "with_commit_context": test_with_commit_context,
                     "rating_scale": "1-5",
-                    "test_tickets_count": len(test_tickets)
-                }
+                    "test_tickets_count": len(test_tickets),
+                },
             },
             summary=f"Root cause evaluation ({'with' if test_with_commit_context else 'without'} commit context): {correlation:.3f} correlation, {accuracy_within_1:.1%} within 1 point",
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         )
 
         # Store result in database
         exec_query(
-            c.table("evaluation_results").insert({
-                "id": str(evaluation_id),
-                "evaluation_type": "rootcause_accuracy",
-                "metrics": result.metrics,
-                "detailed_results": result.detailed_results,
-                "summary": result.summary,
-                "created_at": result.timestamp.isoformat()
-            })
+            c.table("evaluation_results").insert(
+                {
+                    "id": str(evaluation_id),
+                    "evaluation_type": "rootcause_accuracy",
+                    "metrics": result.metrics,
+                    "detailed_results": result.detailed_results,
+                    "summary": result.summary,
+                    "created_at": result.timestamp.isoformat(),
+                }
+            )
         )
 
         return result
@@ -581,7 +672,7 @@ class ComprehensiveEvaluationService:
         self,
         test_tickets: List[UUID],
         ground_truth_tags: Dict[UUID, List[str]],
-        ground_truth_priorities: Dict[UUID, str]
+        ground_truth_priorities: Dict[UUID, str],
     ) -> EvaluationResult:
         """
         Evaluate auto-tagging and prioritization accuracy
@@ -625,7 +716,7 @@ class ComprehensiveEvaluationService:
                     title=ticket["title"],
                     description=ticket.get("description", ""),
                     user_id=None,
-                    client=c
+                    client=c,
                 )
 
                 predicted_tags = set(tagging_result.get("suggested_tags", []))
@@ -641,30 +732,42 @@ class ComprehensiveEvaluationService:
                 tag_relevant += len(ground_truth_tag_set)
 
                 # Calculate priority accuracy
-                priority_match = predicted_priority.lower() == ground_truth_priority.lower()
+                priority_match = (
+                    predicted_priority.lower() == ground_truth_priority.lower()
+                )
                 if priority_match:
                     priority_correct += 1
                 priority_total += 1
 
-                individual_results.append({
-                    "ticket_id": str(ticket_id),
-                    "predicted_tags": list(predicted_tags),
-                    "ground_truth_tags": list(ground_truth_tag_set),
-                    "predicted_priority": predicted_priority,
-                    "ground_truth_priority": ground_truth_priority,
-                    "tag_hits": len(tag_intersection),
-                    "priority_correct": priority_match
-                })
+                individual_results.append(
+                    {
+                        "ticket_id": str(ticket_id),
+                        "predicted_tags": list(predicted_tags),
+                        "ground_truth_tags": list(ground_truth_tag_set),
+                        "predicted_priority": predicted_priority,
+                        "ground_truth_priority": ground_truth_priority,
+                        "tag_hits": len(tag_intersection),
+                        "priority_correct": priority_match,
+                    }
+                )
 
             except Exception as e:
-                logger.error(f"Error evaluating tagging for ticket {ticket_id}: {str(e)}")
+                logger.error(
+                    f"Error evaluating tagging for ticket {ticket_id}: {str(e)}"
+                )
                 continue
 
         # Calculate overall metrics
         tag_precision = tag_hits / tag_predicted if tag_predicted > 0 else 0
         tag_recall = tag_hits / tag_relevant if tag_relevant > 0 else 0
-        tag_f1 = (2 * tag_precision * tag_recall) / (tag_precision + tag_recall) if (tag_precision + tag_recall) > 0 else 0
-        priority_accuracy = priority_correct / priority_total if priority_total > 0 else 0
+        tag_f1 = (
+            (2 * tag_precision * tag_recall) / (tag_precision + tag_recall)
+            if (tag_precision + tag_recall) > 0
+            else 0
+        )
+        priority_accuracy = (
+            priority_correct / priority_total if priority_total > 0 else 0
+        )
 
         # Log evaluation metrics
         await MetricsService.log_event(
@@ -675,14 +778,15 @@ class ComprehensiveEvaluationService:
                 "tag_precision": tag_precision,
                 "tag_recall": tag_recall,
                 "tag_f1": tag_f1,
-                "priority_accuracy": priority_accuracy
+                "priority_accuracy": priority_accuracy,
             },
             response_time_ms=int((time.time() - start_time) * 1000),
-            client=c
+            client=c,
         )
 
         # Create evaluation result
         from uuid import uuid4
+
         evaluation_id = uuid4()
 
         result = EvaluationResult(
@@ -697,28 +801,28 @@ class ComprehensiveEvaluationService:
                 "tag_predicted": tag_predicted,
                 "tag_relevant": tag_relevant,
                 "priority_correct": priority_correct,
-                "priority_total": priority_total
+                "priority_total": priority_total,
             },
             detailed_results={
                 "individual_results": individual_results,
-                "test_parameters": {
-                    "test_tickets_count": len(test_tickets)
-                }
+                "test_parameters": {"test_tickets_count": len(test_tickets)},
             },
             summary=f"Tagging evaluation: Tags F1 {tag_f1:.3f}, Priority accuracy {priority_accuracy:.1%}",
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         )
 
         # Store result in database
         exec_query(
-            c.table("evaluation_results").insert({
-                "id": str(evaluation_id),
-                "evaluation_type": "tagging_accuracy",
-                "metrics": result.metrics,
-                "detailed_results": result.detailed_results,
-                "summary": result.summary,
-                "created_at": result.timestamp.isoformat()
-            })
+            c.table("evaluation_results").insert(
+                {
+                    "id": str(evaluation_id),
+                    "evaluation_type": "tagging_accuracy",
+                    "metrics": result.metrics,
+                    "detailed_results": result.detailed_results,
+                    "summary": result.summary,
+                    "created_at": result.timestamp.isoformat(),
+                }
+            )
         )
 
         return result
@@ -727,7 +831,7 @@ class ComprehensiveEvaluationService:
         self,
         concurrent_users: List[int] = [1, 5, 10, 25, 50],
         requests_per_user: int = 10,
-        test_ticket_ids: Optional[List[UUID]] = None
+        test_ticket_ids: Optional[List[UUID]] = None,
     ) -> EvaluationResult:
         """
         Evaluate system performance under varying loads (Question 3)
@@ -749,11 +853,7 @@ class ComprehensiveEvaluationService:
 
         # Get test tickets if not provided
         if not test_ticket_ids:
-            tickets_resp = exec_query(
-                c.table("tickets")
-                .select("id")
-                .limit(20)
-            )
+            tickets_resp = exec_query(c.table("tickets").select("id").limit(20))
             test_ticket_ids = [UUID(t["id"]) for t in (tickets_resp.data or [])]
 
         if not test_ticket_ids:
@@ -778,7 +878,9 @@ class ComprehensiveEvaluationService:
                 for _ in range(requests_per_user):
                     try:
                         # Randomly choose an AI feature to test
-                        feature = random.choice(["similarity", "rootcause", "auto_tagging"])
+                        feature = random.choice(
+                            ["similarity", "rootcause", "auto_tagging"]
+                        )
                         ticket_id = random.choice(test_ticket_ids)
 
                         request_start = time.time()
@@ -797,15 +899,13 @@ class ComprehensiveEvaluationService:
                                     ticket_text=ticket_text,
                                     current_ticket_id=ticket_id,
                                     limit=3,
-                                    client=c
+                                    client=c,
                                 )
 
                         elif feature == "rootcause":
                             # Test root cause analysis
                             await rootcause_service.analyze_ticket(
-                                ticket_id=ticket_id,
-                                user_id=None,
-                                client=c
+                                ticket_id=ticket_id, user_id=None, client=c
                             )
 
                         elif feature == "auto_tagging":
@@ -820,10 +920,12 @@ class ComprehensiveEvaluationService:
                                 await auto_tagging_service.auto_tag_ticket(
                                     title=ticket_resp.data["title"],
                                     description=ticket_resp.data.get("description", ""),
-                                    client=c
+                                    client=c,
                                 )
 
-                        request_time = (time.time() - request_start) * 1000  # Convert to ms
+                        request_time = (
+                            time.time() - request_start
+                        ) * 1000  # Convert to ms
                         user_response_times.append(request_time)
 
                     except Exception as e:
@@ -851,6 +953,7 @@ class ComprehensiveEvaluationService:
             # Calculate metrics for this concurrency level
             if response_times:
                 import numpy as np
+
                 avg_response_time = np.mean(response_times)
                 p95_response_time = np.percentile(response_times, 95)
                 p99_response_time = np.percentile(response_times, 99)
@@ -863,25 +966,31 @@ class ComprehensiveEvaluationService:
                 throughput = 0
                 error_rate = 1.0
 
-            performance_results.append({
-                "concurrent_users": user_count,
-                "total_requests": total_requests,
-                "total_time_seconds": total_load_time,
-                "avg_response_time_ms": avg_response_time,
-                "p95_response_time_ms": p95_response_time,
-                "p99_response_time_ms": p99_response_time,
-                "throughput_rps": throughput,
-                "error_rate": error_rate,
-                "errors": errors
-            })
+            performance_results.append(
+                {
+                    "concurrent_users": user_count,
+                    "total_requests": total_requests,
+                    "total_time_seconds": total_load_time,
+                    "avg_response_time_ms": avg_response_time,
+                    "p95_response_time_ms": p95_response_time,
+                    "p99_response_time_ms": p99_response_time,
+                    "throughput_rps": throughput,
+                    "error_rate": error_rate,
+                    "errors": errors,
+                }
+            )
 
-            logger.info(f"Completed {user_count} users: {avg_response_time:.1f}ms avg, {throughput:.1f} RPS")
+            logger.info(
+                f"Completed {user_count} users: {avg_response_time:.1f}ms avg, {throughput:.1f} RPS"
+            )
 
         # Calculate overall performance metrics
         if performance_results:
             max_throughput = max(r["throughput_rps"] for r in performance_results)
             min_error_rate = min(r["error_rate"] for r in performance_results)
-            avg_response_time_overall = sum(r["avg_response_time_ms"] for r in performance_results) / len(performance_results)
+            avg_response_time_overall = sum(
+                r["avg_response_time_ms"] for r in performance_results
+            ) / len(performance_results)
         else:
             max_throughput = 0
             min_error_rate = 1.0
@@ -895,14 +1004,15 @@ class ComprehensiveEvaluationService:
                 "max_concurrent_users": max(concurrent_users),
                 "max_throughput_rps": max_throughput,
                 "min_error_rate": min_error_rate,
-                "avg_response_time_ms": avg_response_time_overall
+                "avg_response_time_ms": avg_response_time_overall,
             },
             response_time_ms=int((time.time() - start_time) * 1000),
-            client=c
+            client=c,
         )
 
         # Create evaluation result
         from uuid import uuid4
+
         evaluation_id = uuid4()
 
         result = EvaluationResult(
@@ -913,30 +1023,34 @@ class ComprehensiveEvaluationService:
                 "min_error_rate": min_error_rate,
                 "avg_response_time_ms": avg_response_time_overall,
                 "max_concurrent_users_tested": max(concurrent_users),
-                "total_requests_tested": sum(r["total_requests"] for r in performance_results)
+                "total_requests_tested": sum(
+                    r["total_requests"] for r in performance_results
+                ),
             },
             detailed_results={
                 "performance_by_concurrency": performance_results,
                 "test_parameters": {
                     "concurrent_users_tested": concurrent_users,
                     "requests_per_user": requests_per_user,
-                    "test_tickets_count": len(test_ticket_ids)
-                }
+                    "test_tickets_count": len(test_ticket_ids),
+                },
             },
             summary=f"Performance benchmark: {max_throughput:.1f} max RPS, {avg_response_time_overall:.1f}ms avg response time",
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         )
 
         # Store result in database
         exec_query(
-            c.table("evaluation_results").insert({
-                "id": str(evaluation_id),
-                "evaluation_type": "performance_benchmark",
-                "metrics": result.metrics,
-                "detailed_results": result.detailed_results,
-                "summary": result.summary,
-                "created_at": result.timestamp.isoformat()
-            })
+            c.table("evaluation_results").insert(
+                {
+                    "id": str(evaluation_id),
+                    "evaluation_type": "performance_benchmark",
+                    "metrics": result.metrics,
+                    "detailed_results": result.detailed_results,
+                    "summary": result.summary,
+                    "created_at": result.timestamp.isoformat(),
+                }
+            )
         )
 
         return result

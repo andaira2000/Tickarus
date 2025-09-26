@@ -18,14 +18,12 @@ phases:
       - echo "Building image at ${REPO_URI}:${IMAGE_TAG} from ./backend"
       - cd backend
       - docker build -t "${REPO_URI}:${IMAGE_TAG}" .
-      - docker tag "${REPO_URI}:${IMAGE_TAG}" "${REPO_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
 
   post_build:
     commands:
       - set -eu
       - REPO_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_REPOSITORY}"
       - docker push "${REPO_URI}:${IMAGE_TAG}"
-      - docker push "${REPO_URI}:${CODEBUILD_RESOLVED_SOURCE_VERSION}"
       - echo "Deploying to Lambda..."
       - |
         IMAGE_URI="${REPO_URI}:${IMAGE_TAG}"

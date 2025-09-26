@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
-import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Clock, User } from 'lucide-react';
 
 import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -104,32 +104,32 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
   const getPriorityColor = (priority: TicketPriority) => {
     switch (priority) {
       case 'critical':
-        return 'destructive';
+        return 'bg-red-500';
       case 'high':
-        return 'default';
+        return 'bg-orange-500';
       case 'medium':
-        return 'secondary';
+        return 'bg-yellow-500';
       case 'low':
-        return 'outline';
+        return 'bg-green-500';
       default:
-        return 'secondary';
+        return 'bg-gray-500';
     }
   };
 
   const getStatusColor = (status: TicketStatus) => {
     switch (status) {
       case 'open':
-        return 'destructive';
+        return 'bg-blue-100 text-blue-800';
       case 'in_progress':
-        return 'default';
+        return 'bg-yellow-100 text-yellow-800';
       case 'in_review':
-        return 'secondary';
+        return 'bg-purple-100 text-purple-800';
       case 'resolved':
-        return 'outline';
+        return 'bg-green-100 text-green-800';
       case 'closed':
-        return 'outline';
+        return 'bg-green-100 text-green-800';
       default:
-        return 'secondary';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -177,24 +177,20 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
         </Button>
         
         <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{ticket.title}</h1>
-            <div className="mt-2 flex items-center space-x-4 text-gray-600">
-              <span>Created {new Date(ticket.created_at).toLocaleDateString()}</span>
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{ticket.title}</h1>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>#{ticket.id.slice(-6)}</span>
               <span>•</span>
-              <span>Team: {ticket.team_name}</span>
+              <div className="flex items-center gap-1">
+                <div className={`w-2 h-2 rounded-full ${getPriorityColor(ticket.priority)}`}></div>
+                <span className="capitalize">{formatPriority(ticket.priority)} Priority</span>
+              </div>
               <span>•</span>
-              <TicketCreator ticket={ticket} showAvatar={true} />
+              <Badge variant="secondary" className={getStatusColor(ticket.status)}>
+                {formatStatus(ticket.status)}
+              </Badge>
             </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <TicketCreatorBadge ticket={ticket} />
-            <Badge variant={getStatusColor(ticket.status)}>
-              {formatStatus(ticket.status)}
-            </Badge>
-            <Badge variant={getPriorityColor(ticket.priority)}>
-              {formatPriority(ticket.priority)}
-            </Badge>
           </div>
         </div>
       </div>
@@ -203,19 +199,19 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Description */}
-          <Card>
+          <Card className="shadow-md">
             <CardHeader>
               <CardTitle>Description</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="whitespace-pre-wrap text-gray-700">
+              <div className="whitespace-pre-wrap text-sm text-muted-foreground">
                 {ticket.description}
               </div>
             </CardContent>
           </Card>
 
           {/* Comments */}
-          <Card>
+          <Card className="shadow-md">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <MessageSquare className="w-5 h-5 mr-2" />
@@ -234,14 +230,14 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
                         {new Date(comment.created_at).toLocaleDateString()}
                       </span>
                     </div>
-                    <div className="text-gray-700 whitespace-pre-wrap">
+                    <div className="text-sm text-muted-foreground whitespace-pre-wrap">
                       {comment.content}
                     </div>
                   </div>
                 ))}
-                
+
                 {(!comments || comments.length === 0) && (
-                  <p className="text-gray-500 text-center py-4">
+                  <p className="text-muted-foreground text-center py-4">
                     No comments yet. Be the first to comment!
                   </p>
                 )}
@@ -260,7 +256,7 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
                         <FormLabel>Add Comment</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Share your thoughts or provide updates..."
+                            placeholder="Add a comment..."
                             className="min-h-[100px]"
                             {...field}
                           />
@@ -272,6 +268,7 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
                   <Button
                     type="submit"
                     disabled={commentMutation.isPending}
+                    size="sm"
                   >
                     {commentMutation.isPending ? 'Adding...' : 'Add Comment'}
                   </Button>
@@ -283,59 +280,52 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Status
-                </label>
-                <Select
-                  value={ticket.status}
-                  onValueChange={(value: TicketStatus) => handleStatusChange(value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="in_review">In Review</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                    <SelectItem value="blocked">Blocked</SelectItem>
-                    <SelectItem value="on_hold">On Hold</SelectItem>
-                  </SelectContent>
-                </Select>
+          {/* Status and Priority */}
+          <Card className="shadow-md">
+            <CardContent className="space-y-4 p-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Status</label>
+                  <Select
+                    value={ticket.status}
+                    onValueChange={(value: TicketStatus) => handleStatusChange(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="in_review">In Review</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                      <SelectItem value="blocked">Blocked</SelectItem>
+                      <SelectItem value="on_hold">On Hold</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Priority</label>
+                  <Select
+                    value={ticket.priority}
+                    onValueChange={(value: TicketPriority) => handlePriorityChange(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Priority
-                </label>
-                <Select
-                  value={ticket.priority}
-                  onValueChange={(value: TicketPriority) => handlePriorityChange(value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Team
-                </label>
+                <label className="text-sm font-medium mb-2 block">Team</label>
                 <Select
                   value={ticket.team_id}
                   onValueChange={(value: string) => handleTeamChange(value)}
@@ -356,37 +346,51 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
           </Card>
 
           {/* Ticket Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Ticket Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <span className="text-sm font-medium text-gray-500">Created</span>
-                <p className="text-gray-900">
-                  {new Date(ticket.created_at).toLocaleDateString()}
-                </p>
-              </div>
-              {ticket.updated_at && (
+          <Card className="shadow-md">
+            <CardContent className="space-y-3 p-6">
+              <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-sm font-medium text-gray-500">Last Updated</span>
-                  <p className="text-gray-900">
-                    {new Date(ticket.updated_at).toLocaleDateString()}
+                  <div className="flex items-center gap-2 mb-2">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-medium">Reporter</span>
+                  </div>
+                  <div className="ml-6">
+                    <TicketCreator ticket={ticket} showAvatar={true} />
+                  </div>
+                </div>
+
+                {ticket.assignee_id && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-medium">Assignee</span>
+                    </div>
+                    <p className="text-muted-foreground ml-6">User {ticket.assignee_id}</p>
+                  </div>
+                )}
+
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-medium">Created</span>
+                  </div>
+                  <p className="text-muted-foreground ml-6">
+                    {new Date(ticket.created_at).toLocaleDateString()} at {new Date(ticket.created_at).toLocaleTimeString()}
                   </p>
                 </div>
-              )}
-              <div>
-                <span className="text-sm font-medium text-gray-500">Created By</span>
-                <div className="mt-1">
-                  <TicketCreator ticket={ticket} showAvatar={true} showTypeLabel={true} />
-                </div>
+
+                {ticket.updated_at && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-medium">Updated</span>
+                    </div>
+                    <p className="text-muted-foreground ml-6">
+                      {new Date(ticket.updated_at).toLocaleDateString()} at {new Date(ticket.updated_at).toLocaleTimeString()}
+                    </p>
+                  </div>
+                )}
               </div>
-              {ticket.assignee_id && (
-                <div>
-                  <span className="text-sm font-medium text-gray-500">Assigned To</span>
-                  <p className="text-gray-900">User {ticket.assignee_id}</p>
-                </div>
-              )}
             </CardContent>
           </Card>
 

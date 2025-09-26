@@ -67,32 +67,32 @@ function DashboardContent() {
   const getPriorityColor = (priority: TicketPriority) => {
     switch (priority) {
       case 'critical':
-        return 'destructive';
+        return 'bg-red-500';
       case 'high':
-        return 'default';
+        return 'bg-orange-500';
       case 'medium':
-        return 'secondary';
+        return 'bg-yellow-500';
       case 'low':
-        return 'outline';
+        return 'bg-green-500';
       default:
-        return 'secondary';
+        return 'bg-gray-500';
     }
   };
 
   const getStatusColor = (status: TicketStatus) => {
     switch (status) {
       case 'open':
-        return 'destructive';
+        return 'bg-blue-100 text-blue-800';
       case 'in_progress':
-        return 'default';
+        return 'bg-yellow-100 text-yellow-800';
       case 'in_review':
-        return 'secondary';
+        return 'bg-purple-100 text-purple-800';
       case 'resolved':
-        return 'outline';
+        return 'bg-green-100 text-green-800';
       case 'closed':
-        return 'outline';
+        return 'bg-green-100 text-green-800';
       default:
-        return 'secondary';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -108,7 +108,7 @@ function DashboardContent() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         {stats.map((stat) => (
-          <Card key={stat.name}>
+          <Card key={stat.name} className="shadow-md hover:shadow-lg transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
                 {stat.name}
@@ -133,7 +133,7 @@ function DashboardContent() {
 
       {/* Recent Tickets */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+        <Card className="shadow-md">
           <CardHeader>
             <CardTitle>Recent Tickets</CardTitle>
             <CardDescription>Latest tickets across all teams</CardDescription>
@@ -151,10 +151,11 @@ function DashboardContent() {
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Badge variant={getPriorityColor(ticket.priority)}>
-                      {ticket.priority}
-                    </Badge>
-                    <Badge variant={getStatusColor(ticket.status)}>
+                    <div className="flex items-center gap-1">
+                      <div className={`w-2 h-2 rounded-full ${getPriorityColor(ticket.priority)}`}></div>
+                      <span className="text-xs capitalize">{ticket.priority}</span>
+                    </div>
+                    <Badge variant="secondary" className={getStatusColor(ticket.status)}>
                       {ticket.status}
                     </Badge>
                   </div>
@@ -169,7 +170,7 @@ function DashboardContent() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-md">
           <CardHeader>
             <CardTitle>My Teams</CardTitle>
             <CardDescription>Teams you&apos;re a member of</CardDescription>

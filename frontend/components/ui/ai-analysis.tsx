@@ -75,34 +75,25 @@ export function AIAnalysis({ ticketId, className }: AIAnalysisProps) {
 
   if (!isExpanded) {
     return (
-      <Card className={className}>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Brain className="w-5 h-5 mr-2 text-purple-600" />
+      <Card className={`shadow-md ${className}`}>
+        <CardContent className="p-6">
+          <div className="bg-purple-50 p-4 rounded-lg">
+            <h4 className="flex items-center gap-2 mb-3">
+              <Brain className="w-4 h-4 text-purple-600" />
               AI Root Cause Analysis
-            </div>
+            </h4>
+            <p className="text-sm text-muted-foreground mb-3">
+              Get AI-powered analysis of potential root causes and solutions for this ticket.
+            </p>
             <Button
-              variant="ghost"
-              size="sm"
               onClick={() => setIsExpanded(true)}
+              className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+              variant="default"
             >
-              <Brain className="w-4 h-4" />
+              <Brain className="w-4 h-4 mr-2" />
+              Analyze Ticket
             </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-600 text-sm mb-3">
-            Get AI-powered analysis of potential root causes and solutions for this ticket.
-          </p>
-          <Button
-            onClick={() => setIsExpanded(true)}
-            className="w-full"
-            variant="outline"
-          >
-            <Brain className="w-4 h-4 mr-2" />
-            Analyze Ticket
-          </Button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -110,33 +101,24 @@ export function AIAnalysis({ ticketId, className }: AIAnalysisProps) {
 
   if (isLoading) {
     return (
-      <Card className={className}>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Brain className="w-5 h-5 mr-2 text-purple-600" />
+      <Card className={`shadow-md ${className}`}>
+        <CardContent className="p-6">
+          <div className="bg-purple-50 p-4 rounded-lg">
+            <h4 className="flex items-center gap-2 mb-3">
+              <Brain className="w-4 h-4 text-purple-600" />
               AI Root Cause Analysis
+            </h4>
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-6 h-6 animate-spin text-purple-600 mr-2" />
+              <span className="text-sm text-muted-foreground">
+                AI is analyzing this ticket...
+              </span>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsExpanded(false)}
-            >
-              ×
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="w-6 h-6 animate-spin text-purple-600 mr-2" />
-            <span className="text-sm text-gray-600">
-              AI is analyzing this ticket...
-            </span>
-          </div>
-          <div className="space-y-3">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-20 w-full" />
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-20 w-full" />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -192,39 +174,39 @@ export function AIAnalysis({ ticketId, className }: AIAnalysisProps) {
   }
 
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center">
-            <Brain className="w-5 h-5 mr-2 text-purple-600" />
-            AI Root Cause Analysis
-            <Badge variant="secondary" className="ml-2">
-              {analysis.llm_used ? 'LLM-powered' : 'Pattern-based'}
-            </Badge>
+    <Card className={`shadow-md ${className}`}>
+      <CardContent className="p-6">
+        <div className="bg-purple-50 p-4 rounded-lg space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="flex items-center gap-2">
+              <Brain className="w-4 h-4 text-purple-600" />
+              AI Root Cause Analysis
+              <Badge variant="outline" className="border-purple-300 text-purple-700">
+                {analysis.llm_used ? 'LLM-powered' : 'Pattern-based'}
+              </Badge>
+            </h4>
+            <div className="flex items-center space-x-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isLoading}
+                title="Refresh analysis"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsExpanded(false)}
+              >
+                ×
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center space-x-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => refetch()}
-              disabled={isLoading}
-              title="Refresh analysis"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsExpanded(false)}
-            >
-              ×
-            </Button>
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Confidence Level */}
-        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+
+          {/* Confidence Level */}
+          <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-purple-200">
           <div className="flex items-center">
             <span className="text-lg mr-2">
               {getConfidenceEmoji(analysis.confidence_score)}
@@ -358,8 +340,9 @@ export function AIAnalysis({ ticketId, className }: AIAnalysisProps) {
           )}
         </div>
 
-        <div className="text-xs text-gray-500 pt-2 border-t">
-          💡 This analysis is AI-generated and should be reviewed by human experts.
+          <div className="text-xs text-muted-foreground pt-2 border-t border-purple-200">
+            💡 This analysis is AI-generated and should be reviewed by human experts.
+          </div>
         </div>
       </CardContent>
     </Card>

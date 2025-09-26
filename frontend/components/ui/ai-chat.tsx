@@ -127,11 +127,13 @@ export function AIChat({ ticketId, className }: AIChatProps) {
 
   if (!isExpanded) {
     return (
-      <Card className={className}>
+      <Card className={`shadow-md ${className}`}>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center">
-              <Bot className="w-5 h-5 mr-2 text-blue-600" />
+              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center mr-2">
+                <Bot className="w-4 h-4 text-white" />
+              </div>
               AI Assistant
             </div>
             <Button
@@ -144,13 +146,13 @@ export function AIChat({ ticketId, className }: AIChatProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-gray-600 text-sm mb-3">
+          <p className="text-muted-foreground text-sm mb-3">
             Get AI-powered help with analyzing and solving this ticket.
           </p>
           <Button
             onClick={() => setIsExpanded(true)}
-            className="w-full"
-            variant="outline"
+            className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+            variant="default"
           >
             Start AI Chat
           </Button>
@@ -160,14 +162,16 @@ export function AIChat({ ticketId, className }: AIChatProps) {
   }
 
   return (
-    <Card className={className}>
+    <Card className={`shadow-md ${className}`}>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center">
-            <Bot className="w-5 h-5 mr-2 text-blue-600" />
+            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center mr-2">
+              <Bot className="w-4 h-4 text-white" />
+            </div>
             AI Assistant
             {currentSession && (
-              <Badge variant="secondary" className="ml-2">
+              <Badge variant="outline" className="ml-2 border-purple-300 text-purple-700">
                 Active
               </Badge>
             )}
@@ -228,7 +232,7 @@ export function AIChat({ ticketId, className }: AIChatProps) {
                 <div
                   className={`max-w-[85%] rounded-lg px-3 py-2 ${
                     message.role === 'user'
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-blue-500 text-white'
                       : message.role === 'assistant'
                       ? 'bg-gray-100 text-gray-900'
                       : 'bg-yellow-50 text-yellow-800 text-sm'
@@ -236,10 +240,14 @@ export function AIChat({ ticketId, className }: AIChatProps) {
                 >
                   <div className="flex items-start space-x-2">
                     {message.role === 'assistant' && (
-                      <Bot className="w-4 h-4 mt-0.5 text-blue-600 flex-shrink-0" />
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Bot className="w-3 h-3 text-white" />
+                      </div>
                     )}
                     {message.role === 'user' && (
-                      <User className="w-4 h-4 mt-0.5 text-white flex-shrink-0" />
+                      <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <User className="w-3 h-3 text-gray-600" />
+                      </div>
                     )}
                     <div className="whitespace-pre-wrap text-sm">
                       {message.content}

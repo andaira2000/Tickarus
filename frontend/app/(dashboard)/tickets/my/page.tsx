@@ -53,32 +53,32 @@ function MyTicketsContent() {
   const getPriorityColor = (priority: TicketPriority) => {
     switch (priority) {
       case 'critical':
-        return 'destructive';
+        return 'bg-red-500';
       case 'high':
-        return 'default';
+        return 'bg-orange-500';
       case 'medium':
-        return 'secondary';
+        return 'bg-yellow-500';
       case 'low':
-        return 'outline';
+        return 'bg-green-500';
       default:
-        return 'secondary';
+        return 'bg-gray-500';
     }
   };
 
   const getStatusColor = (status: TicketStatus) => {
     switch (status) {
       case 'open':
-        return 'destructive';
+        return 'bg-blue-100 text-blue-800';
       case 'in_progress':
-        return 'default';
+        return 'bg-yellow-100 text-yellow-800';
       case 'in_review':
-        return 'secondary';
+        return 'bg-purple-100 text-purple-800';
       case 'resolved':
-        return 'outline';
+        return 'bg-green-100 text-green-800';
       case 'closed':
-        return 'outline';
+        return 'bg-green-100 text-green-800';
       default:
-        return 'secondary';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -93,7 +93,7 @@ function MyTicketsContent() {
   };
 
   const renderTicketsTable = (tickets: TicketList | undefined, isLoading: boolean) => (
-    <Card>
+    <Card className="shadow-md">
       <CardContent className="p-0">
         <Table>
           <TableHeader>
@@ -125,14 +125,15 @@ function MyTicketsContent() {
                   </span>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={getStatusColor(ticket.status)}>
+                  <Badge variant="secondary" className={getStatusColor(ticket.status)}>
                     {formatStatus(ticket.status)}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={getPriorityColor(ticket.priority)}>
-                    {formatPriority(ticket.priority)}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${getPriorityColor(ticket.priority)}`}></div>
+                    <span className="text-sm capitalize">{formatPriority(ticket.priority)}</span>
+                  </div>
                 </TableCell>
                 <TableCell>
                   <TicketCreator ticket={ticket} showAvatar={true} />
@@ -190,7 +191,7 @@ function MyTicketsContent() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card>
+        <Card className="shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
               Created by Me
@@ -200,8 +201,8 @@ function MyTicketsContent() {
             <div className="text-2xl font-bold">{createdTickets?.total || 0}</div>
           </CardContent>
         </Card>
-        
-        <Card>
+
+        <Card className="shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
               Assigned to Me
@@ -211,8 +212,8 @@ function MyTicketsContent() {
             <div className="text-2xl font-bold">{assignedTickets?.total || 0}</div>
           </CardContent>
         </Card>
-        
-        <Card>
+
+        <Card className="shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600">
               I Commented On

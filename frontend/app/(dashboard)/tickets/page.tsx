@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Search, Filter, Plus, Eye } from 'lucide-react';
+import { Search, Filter, Plus, Eye, SortAsc, SortDesc, Clock, User, MessageSquare } from 'lucide-react';
 
 import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +21,8 @@ function TicketsContent() {
     page: 1,
     page_size: 20,
   });
+  const [sortBy, setSortBy] = useState<string>('created');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const { data: tickets, isLoading } = useQuery({
     queryKey: ['tickets', filters],
@@ -51,32 +53,32 @@ function TicketsContent() {
   const getPriorityColor = (priority: TicketPriority) => {
     switch (priority) {
       case 'critical':
-        return 'destructive';
+        return 'bg-red-500';
       case 'high':
-        return 'default';
+        return 'bg-orange-500';
       case 'medium':
-        return 'secondary';
+        return 'bg-yellow-500';
       case 'low':
-        return 'outline';
+        return 'bg-green-500';
       default:
-        return 'secondary';
+        return 'bg-gray-500';
     }
   };
 
   const getStatusColor = (status: TicketStatus) => {
     switch (status) {
       case 'open':
-        return 'destructive';
+        return 'bg-blue-100 text-blue-800';
       case 'in_progress':
-        return 'default';
+        return 'bg-yellow-100 text-yellow-800';
       case 'in_review':
-        return 'secondary';
+        return 'bg-purple-100 text-purple-800';
       case 'resolved':
-        return 'outline';
+        return 'bg-green-100 text-green-800';
       case 'closed':
-        return 'outline';
+        return 'bg-green-100 text-green-800';
       default:
-        return 'secondary';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -88,6 +90,27 @@ function TicketsContent() {
 
   const formatPriority = (priority: TicketPriority) => {
     return priority.charAt(0).toUpperCase() + priority.slice(1);
+  };
+
+  const getStatusCounts = () => {
+    const counts = tickets?.tickets?.reduce((acc, ticket) => {
+      acc[ticket.status] = (acc[ticket.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>) || {};
+
+    return {
+      all: tickets?.total || 0,
+      open: counts.open || 0,
+      in_progress: counts.in_progress || 0,
+      resolved: counts.resolved || 0,
+      closed: counts.closed || 0
+    };
+  };
+
+  const statusCounts = getStatusCounts();
+
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
   };
 
   return (
@@ -107,155 +130,172 @@ function TicketsContent() {
         </Link>
       </div>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Filter className="w-4 h-4 mr-2" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search tickets..."
-                className="pl-10"
-                value={filters.q || ''}
-                onChange={(e) => handleSearch(e.target.value)}
-              />
-            </div>
+      {/* Header with counts */}
+      <div className="flex flex-wrap gap-4 mb-6">
+        <Badge variant="outline" className="px-3 py-1">
+          All: {statusCounts.all}
+        </Badge>
+        <Badge variant="outline" className="px-3 py-1 bg-blue-50 text-blue-700 border-blue-200">
+          Open: {statusCounts.open}
+        </Badge>
+        <Badge variant="outline" className="px-3 py-1 bg-yellow-50 text-yellow-700 border-yellow-200">
+          In Progress: {statusCounts.in_progress}
+        </Badge>
+        <Badge variant="outline" className="px-3 py-1 bg-green-50 text-green-700 border-green-200">
+          Resolved: {statusCounts.resolved}
+        </Badge>
+        <Badge variant="outline" className="px-3 py-1 bg-green-50 text-green-700 border-green-200">
+          Closed: {statusCounts.closed}
+        </Badge>
+      </div>
 
-            <Select value={filters.team_id || 'all'} onValueChange={(value) => 
-              handleFilterChange('team_id', value === 'all' ? undefined : value)
-            }>
-              <SelectTrigger>
-                <SelectValue placeholder="All Teams" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Teams</SelectItem>
-                {teams?.map((team) => (
-                  <SelectItem key={team.id} value={team.id}>
-                    {team.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Input
+            placeholder="Search tickets by title, description, tags, or reporter..."
+            value={filters.q || ''}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
 
-            <Select value={filters.status || 'all'} onValueChange={(value) => 
-              handleFilterChange('status', value === 'all' ? undefined : value)
-            }>
-              <SelectTrigger>
-                <SelectValue placeholder="All Statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="in_review">In Review</SelectItem>
-                <SelectItem value="resolved">Resolved</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
-                <SelectItem value="blocked">Blocked</SelectItem>
-                <SelectItem value="on_hold">On Hold</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="flex gap-2">
+          <Select value={filters.team_id || 'all'} onValueChange={(value) =>
+            handleFilterChange('team_id', value === 'all' ? undefined : value)
+          }>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="All Teams" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Teams</SelectItem>
+              {teams?.map((team) => (
+                <SelectItem key={team.id} value={team.id}>
+                  {team.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-            <Select value={filters.priority || 'all'} onValueChange={(value) => 
-              handleFilterChange('priority', value === 'all' ? undefined : value)
-            }>
-              <SelectTrigger>
-                <SelectValue placeholder="All Priorities" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priorities</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+          <Select value={filters.status || 'all'} onValueChange={(value) =>
+            handleFilterChange('status', value === 'all' ? undefined : value)
+          }>
+            <SelectTrigger className="w-[140px]">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="open">Open</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="in_review">In Review</SelectItem>
+              <SelectItem value="resolved">Resolved</SelectItem>
+              <SelectItem value="closed">Closed</SelectItem>
+            </SelectContent>
+          </Select>
 
-      {/* Tickets Table */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Team</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Creator</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Comments</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tickets?.tickets?.map((ticket) => (
-                <TableRow key={ticket.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium text-gray-900">{ticket.title}</p>
-                      <p className="text-sm text-gray-500 truncate max-w-xs">
-                        {ticket.description}
-                      </p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-gray-600">
-                      {ticket.team_name}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusColor(ticket.status)}>
+          <Select value={filters.priority || 'all'} onValueChange={(value) =>
+            handleFilterChange('priority', value === 'all' ? undefined : value)
+          }>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="All Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Priority</SelectItem>
+              <SelectItem value="critical">Critical</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created">Created</SelectItem>
+              <SelectItem value="updated">Updated</SelectItem>
+              <SelectItem value="title">Title</SelectItem>
+              <SelectItem value="priority">Priority</SelectItem>
+              <SelectItem value="status">Status</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button variant="outline" size="icon" onClick={toggleSortOrder}>
+            {sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
+          </Button>
+        </div>
+      </div>
+
+      {/* Results count */}
+      <div className="text-sm text-muted-foreground mb-4">
+        Showing {tickets?.tickets?.length || 0} of {tickets?.total || 0} tickets
+      </div>
+
+      {/* Tickets List */}
+      <div className="space-y-4">
+        {tickets?.tickets?.map((ticket) => (
+          <Card key={ticket.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = `/tickets/${ticket.id}`}>
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="mb-2 text-lg font-medium">{ticket.title}</h3>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className={`w-2 h-2 rounded-full ${getPriorityColor(ticket.priority)}`}></div>
+                    <span className="capitalize">{formatPriority(ticket.priority)} Priority</span>
+                    <span>•</span>
+                    <Badge variant="secondary" className={getStatusColor(ticket.status)}>
                       {formatStatus(ticket.status)}
                     </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getPriorityColor(ticket.priority)}>
-                      {formatPriority(ticket.priority)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <TicketCreator ticket={ticket} showAvatar={true} />
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-gray-500">
-                      {new Date(ticket.created_at).toLocaleDateString()}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-gray-500">
-                      {ticket.comments_count || 0}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Link href={`/tickets/${ticket.id}`}>
-                      <Button variant="ghost" size="sm">
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {(!tickets?.tickets || tickets.tickets.length === 0) && (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
-                    <div className="text-gray-500">
-                      {isLoading ? 'Loading tickets...' : 'No tickets found'}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  </div>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  #{ticket.id.slice(-6)}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                {ticket.description}
+              </p>
+
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1">
+                    <User className="w-3 h-3" />
+                    <span>{ticket.creator_name || 'Unknown'}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span>Team: {ticket.team_name}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <MessageSquare className="w-3 h-3" />
+                  <span>{ticket.comments_count || 0} comments</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+        {(!tickets?.tickets || tickets.tickets.length === 0) && (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+              <Search className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg mb-2">No tickets found</h3>
+            <p className="text-muted-foreground">
+              {isLoading ? 'Loading tickets...' : 'Try adjusting your search or filters'}
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Pagination */}
       {tickets && tickets.total > tickets.page_size && (

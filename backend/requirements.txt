@@ -1,6 +1,7 @@
 # Core Framework
 fastapi>=0.110,<0.116
 uvicorn[standard]>=0.25,<0.31
+mangum>=0.17,<0.18
 
 # Env & Config
 python-dotenv>=1.0,<2.0

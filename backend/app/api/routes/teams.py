@@ -8,14 +8,14 @@ from app.services.team_service import TeamService
 router = APIRouter()
 
 
-@router.post("/", response_model=Team)
+@router.post("", response_model=Team)
 async def create_team(
     payload: TeamCreate, current_user_id: UUID = Depends(get_current_user_id)
 ):
     return await TeamService.create_team(payload, current_user_id)
 
 
-@router.get("/", response_model=List[Team])
+@router.get("", response_model=List[Team])
 async def list_teams(current_user_id: UUID = Depends(get_current_user_id)):
     return await TeamService.list_teams()
 

@@ -42,7 +42,7 @@ class SimilarityClickRequest(BaseModel):
     original_ticket_id: Optional[UUID] = None
 
 
-@router.post("/", response_model=Ticket)
+@router.post("", response_model=Ticket)
 async def create_ticket(
     ticket: TicketCreate, current_user_id: UUID = Depends(get_current_user_id)
 ):
@@ -56,7 +56,7 @@ async def create_ticket(
     return await TicketService.create_ticket(ticket, user_actor.id)
 
 
-@router.get("/", response_model=TicketList)
+@router.get("", response_model=TicketList)
 async def list_tickets(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),

@@ -8,19 +8,17 @@ from app.services.comment_service import CommentService
 router = APIRouter()
 
 
-@router.post("/", response_model=Comment)
+@router.post("", response_model=Comment)
 async def create_comment(
     payload: CommentCreate, current_user_id: UUID = Depends(get_current_user_id)
 ):
     # Get the actor ID for the current user
     from app.services.actor_service import ActorService
+
     user_actor = await ActorService.get_actor_for_user(current_user_id)
     if not user_actor:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="User actor not found"
-        )
-    
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="User actor not found")
+
     return await CommentService.create_comment(payload, user_actor.id)
 
 
@@ -39,13 +37,11 @@ async def update_comment(
 ):
     # Get the actor ID for the current user
     from app.services.actor_service import ActorService
+
     user_actor = await ActorService.get_actor_for_user(current_user_id)
     if not user_actor:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="User actor not found"
-        )
-    
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="User actor not found")
+
     return await CommentService.update_comment(comment_id, patch, user_actor.id)
 
 
@@ -55,12 +51,10 @@ async def delete_comment(
 ):
     # Get the actor ID for the current user
     from app.services.actor_service import ActorService
+
     user_actor = await ActorService.get_actor_for_user(current_user_id)
     if not user_actor:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="User actor not found"
-        )
-    
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="User actor not found")
+
     await CommentService.delete_comment(comment_id, user_actor.id)
     return {"message": "Comment deleted"}

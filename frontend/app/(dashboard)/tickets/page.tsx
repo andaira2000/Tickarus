@@ -115,19 +115,11 @@ function TicketsContent() {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">All Tickets</h1>
-          <p className="mt-2 text-gray-600">
-            Manage and track tickets across all teams
-          </p>
-        </div>
-        <Link href="/tickets/new">
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            New Ticket
-          </Button>
-        </Link>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">All Tickets</h1>
+        <p className="mt-2 text-gray-600">
+          Manage and track tickets across all teams
+        </p>
       </div>
 
       {/* Header with counts */}
@@ -260,6 +252,16 @@ function TicketsContent() {
               <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
                 {ticket.description}
               </p>
+
+              {ticket.tags && ticket.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {ticket.tags.map((tag) => (
+                    <Badge key={tag} variant="outline" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
 
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <div className="flex items-center gap-4">

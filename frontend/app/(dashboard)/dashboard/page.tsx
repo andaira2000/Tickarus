@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Ticket, Users, Clock, CheckCircle } from 'lucide-react';
+import { Ticket, Users, Clock, CheckCircle, Tag } from 'lucide-react';
 
 import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -149,6 +149,20 @@ function DashboardContent() {
                     <p className="text-xs text-gray-500">
                       {ticket.team_name} • {new Date(ticket.created_at).toLocaleDateString()}
                     </p>
+                    {ticket.tags && ticket.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {ticket.tags.slice(0, 2).map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                        {ticket.tags.length > 2 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{ticket.tags.length - 2}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="flex items-center gap-1">

@@ -1,18 +1,20 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Ticket, 
-  Users, 
+import {
+  LayoutDashboard,
+  Ticket,
+  Users,
   Search,
   Settings,
   LogOut,
   Plus,
-  Bell
+  Bell,
+  Menu,
+  X
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -63,6 +65,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, isAuthenticated, isInitialized, logout } = useAuthStore();
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    // Initialize from localStorage if available, default to true
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('sidebar-open');
+      return stored !== null ? JSON.parse(stored) : true;
+    }
+    return true;
+  });
 
   // More precise path matching function
   const isPathActive = (href: string) => {
@@ -89,6 +99,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     router.push('/login');
   };
 
+  const toggleSidebar = () => {
+    const newState = !sidebarOpen;
+    setSidebarOpen(newState);
+    // Persist to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebar-open', JSON.stringify(newState));
+    }
+  };
+
   // Show loading spinner while auth is initializing
   if (!isInitialized) {
     return (
@@ -108,18 +127,28 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <div className="fixed inset-y-0 z-50 flex w-64 flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white px-6 py-4 shadow-sm">
-          {/* Logo */}
-          <div className="flex h-16 shrink-0 items-center">
-            <h1 className="text-2xl font-bold text-blue-600">Tickarus</h1>
+      <div className={`fixed inset-y-0 z-50 flex ${sidebarOpen ? 'w-64' : 'w-16'} flex-col transition-all duration-300 ease-in-out`}>
+        <div className={`flex grow flex-col gap-y-5 overflow-y-auto bg-white py-4 shadow-sm ${sidebarOpen ? 'px-6' : 'px-2'} transition-all duration-300`}>
+          {/* Logo and Toggle */}
+          <div className="flex h-16 shrink-0 items-center justify-between">
+            {sidebarOpen && (
+              <h1 className="text-2xl font-bold text-blue-600">Tickarus</h1>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleSidebar}
+              className="hover:bg-gray-100"
+            >
+              {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </Button>
           </div>
 
           {/* Create Ticket Button */}
           <Link href="/tickets/new">
-            <Button className="w-full justify-start" size="sm">
-              <Plus className="mr-2 h-4 w-4" />
-              New Ticket
+            <Button className={`w-full ${sidebarOpen ? 'justify-start' : 'justify-center'}`} size="sm">
+              <Plus className={`h-4 w-4 ${sidebarOpen ? 'mr-2' : ''}`} />
+              {sidebarOpen && 'New Ticket'}
             </Button>
           </Link>
 
@@ -136,8 +165,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                           isPathActive(item.href)
                             ? 'bg-gray-100 text-blue-600'
                             : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50',
-                          'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
+                          'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold',
+                          !sidebarOpen && 'justify-center'
                         )}
+                        title={!sidebarOpen ? item.name : undefined}
                       >
                         <item.icon
                           className={cn(
@@ -148,7 +179,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                           )}
                           aria-hidden="true"
                         />
-                        {item.name}
+                        {sidebarOpen && item.name}
                       </Link>
                     </li>
                   ))}
@@ -161,18 +192,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="mt-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="w-full justify-start p-2">
+                <Button variant="ghost" className={`w-full ${sidebarOpen ? 'justify-start' : 'justify-center'} p-2`}>
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>
                       {user?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="ml-3 text-left">
-                    <p className="text-sm font-medium text-gray-900">
-                      {user?.full_name || user?.email}
-                    </p>
-                    <p className="text-xs text-gray-500">{user?.email}</p>
-                  </div>
+                  {sidebarOpen && (
+                    <div className="ml-3 text-left">
+                      <p className="text-sm font-medium text-gray-900">
+                        {user?.full_name || user?.email}
+                      </p>
+                      <p className="text-xs text-gray-500">{user?.email}</p>
+                    </div>
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -192,7 +225,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       </div>
 
       {/* Main content */}
-      <div className="pl-64">
+      <div className={`${sidebarOpen ? 'pl-64' : 'pl-16'} transition-all duration-300 ease-in-out`}>
         <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
           <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
             <div className="flex flex-1"></div>

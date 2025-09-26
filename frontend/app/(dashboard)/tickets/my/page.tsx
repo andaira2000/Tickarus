@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { Plus, Eye } from 'lucide-react';
+import { Plus, Eye, Tag } from 'lucide-react';
 
 import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -117,6 +117,20 @@ function MyTicketsContent() {
                     <p className="text-sm text-gray-500 truncate max-w-xs">
                       {ticket.description}
                     </p>
+                    {ticket.tags && ticket.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {ticket.tags.slice(0, 3).map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                        {ticket.tags.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{ticket.tags.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -174,19 +188,11 @@ function MyTicketsContent() {
 
   return (
     <>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Tickets</h1>
-          <p className="mt-2 text-gray-600">
-            View and manage tickets related to you
-          </p>
-        </div>
-        <Link href="/tickets/new">
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            New Ticket
-          </Button>
-        </Link>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">My Tickets</h1>
+        <p className="mt-2 text-gray-600">
+          View and manage tickets related to you
+        </p>
       </div>
 
       {/* Stats */}

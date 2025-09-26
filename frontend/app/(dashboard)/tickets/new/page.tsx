@@ -111,6 +111,7 @@ function CreateTicketContent() {
                     <FormControl>
                       <Input
                         placeholder="Brief description of the issue..."
+                        className="bg-input-background"
                         {...field}
                       />
                     </FormControl>
@@ -131,7 +132,7 @@ function CreateTicketContent() {
                     <FormControl>
                       <Textarea
                         placeholder="Provide detailed information about the issue, including steps to reproduce, expected behavior, and any relevant context..."
-                        className="min-h-[120px]"
+                        className="min-h-[120px] bg-input-background"
                         {...field}
                       />
                     </FormControl>
@@ -152,7 +153,7 @@ function CreateTicketContent() {
                       <FormLabel>Team</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="bg-input-background">
                             <SelectValue placeholder="Select a team" />
                           </SelectTrigger>
                         </FormControl>
@@ -180,7 +181,7 @@ function CreateTicketContent() {
                       <FormLabel>Priority</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="bg-input-background">
                             <SelectValue placeholder="Select priority" />
                           </SelectTrigger>
                         </FormControl>

@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
-import { ArrowLeft, MessageSquare, Clock, User } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Clock, User, Tag, Bot } from 'lucide-react';
 
 import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -143,6 +143,10 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
     return priority.charAt(0).toUpperCase() + priority.slice(1);
   };
 
+  const isAIAssistantComment = (comment: any) => {
+    return comment.author_info?.system_user_type === 'ai_assistant';
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -210,6 +214,28 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
             </CardContent>
           </Card>
 
+          {/* Tags */}
+          {ticket.tags && ticket.tags.length > 0 && (
+            <Card className="shadow-md">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Tag className="w-4 h-4 mr-2" />
+                  Tags
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {ticket.tags.map((tag) => (
+                    <Badge key={tag} variant="outline">
+                      <Tag className="w-3 h-3 mr-1" />
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Comments */}
           <Card className="shadow-md">
             <CardHeader>
@@ -220,21 +246,116 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {comments?.map((comment) => (
-                  <div key={comment.id} className="border-l-2 border-gray-200 pl-4">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="font-medium text-gray-900">
-                        {comment.author_info ? comment.author_info.display_name : 'Unknown User'}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {new Date(comment.created_at).toLocaleDateString()}
-                      </span>
+                {comments?.map((comment) => {
+                  const isAI = isAIAssistantComment(comment);
+
+                  if (isAI) {
+                    return (
+                      <div key={comment.id} className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <div className="flex items-center space-x-2 mb-3">
+                          <div className="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
+                            <Bot className="w-3 h-3 text-white" />
+                          </div>
+                          <span className="font-medium text-purple-700">
+                            {comment.author_info?.display_name || 'Tickarus AI Assistant'}
+                          </span>
+                          <Badge variant="outline" className="border-purple-300 text-purple-700 text-xs">
+                            AI Assistant
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(comment.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-700 leading-relaxed text-justify px-2" style={{ textAlignLast: 'left' }}>
+                          {(() => {
+                            let processedContent = comment.content
+                              .replace(/[🎯📋🔍💡✅❌⚠️🚀📊🔧⭐🤖🟢🟡🔴]/g, '') // Remove common emojis including robot and colored circles
+                              .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '') // Remove all emojis
+                              .replace(/(?:^|\n)\s*(?:\*\*)?AI Root Cause Analysis(?:\*\*)?\s*(?:\n|$)/gi, '\n') // Remove AI Root Cause Analysis header
+                              .replace(/(?:^|\n)\s*(?:\*\*)?Root Cause Analysis(?:\*\*)?\s*(?:\n|$)/gi, '\n') // Remove Root Cause Analysis header
+                              .replace(/---.*?Analysis method:.*?(?:\n|$)/gi, '') // Remove analysis method line
+                              .replace(/.*?Analysis method:.*?(?:\n|$)/gi, '') // Remove analysis method line (alternative format)
+                              .replace(/^\s*---+\s*$/gm, '') // Remove standalone dashes
+                              .replace(/^\s*---.*$/gm, '') // Remove lines starting with ---
+                              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Convert ** to HTML bold
+                              .replace(/#{1,6}\s(.*?)(?=\n|$)/g, '<strong>$1</strong>') // Convert headers to bold
+                              .replace(/^\s*[-*+]\s(.+)/gm, '<p class="mb-2">• $1</p>') // Convert bullet points to separate paragraphs
+                              .replace(/^\s*(\d+)\.\s(.+)/gm, '<p class="mb-2">$1. $2</p>') // Convert numbered lists to separate paragraphs
+                              .replace(/`([^`]+)`/g, '$1') // Remove code formatting
+                              .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Convert links to text only
+                              .replace(/\n\n+/g, '\n\n') // Normalize paragraph breaks
+                              .trim();
+
+                            // Extract confidence level if present
+                            const confidenceMatch = processedContent.match(/(?:^|\n)\s*(?:\*\*)?Confidence Level:?\s*([^(\n]*?)(?:\s*\(([^)]+)\))?(?:\n|$)/i);
+                            let confidenceLevel = null;
+                            if (confidenceMatch) {
+                              const level = confidenceMatch[1].trim();
+                              const percentage = confidenceMatch[2] ? confidenceMatch[2].trim() : null;
+
+                              // Format the confidence level like "High (90%)" or just "High" if no percentage
+                              if (percentage) {
+                                confidenceLevel = `${level} (${percentage.replace('%', '')}%)`;
+                              } else {
+                                confidenceLevel = level;
+                              }
+
+                              // Remove confidence level from main content
+                              processedContent = processedContent.replace(/(?:^|\n)\s*(?:\*\*)?Confidence Level:?.*?(?:\n|$)/gi, '\n');
+                            }
+
+                            // Process the main content
+                            const mainContent = processedContent
+                              .split('\n\n')
+                              .map(paragraph => paragraph.trim())
+                              .filter(paragraph => paragraph.length > 0)
+                              .filter(paragraph => !paragraph.match(/^<p class="mb-2">/)) // Filter out list items that were already processed
+                              .map(paragraph => {
+                                // Skip paragraphs that are already processed list items
+                                if (paragraph.includes('<p class="mb-2">')) {
+                                  return paragraph;
+                                }
+                                return `<p class="mb-3">${paragraph}</p>`;
+                              })
+                              .join('');
+
+                            return (
+                              <>
+                                {confidenceLevel && (
+                                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                      <span className="text-xs font-medium text-blue-700">
+                                        Confidence Level: {confidenceLevel}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+                                <div dangerouslySetInnerHTML={{ __html: mainContent }} />
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={comment.id} className="border-l-2 border-gray-200 pl-4">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="font-medium text-gray-900">
+                          {comment.author_info ? comment.author_info.display_name : 'Unknown User'}
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          {new Date(comment.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {comment.content}
+                      </div>
                     </div>
-                    <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {comment.content}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {(!comments || comments.length === 0) && (
                   <p className="text-muted-foreground text-center py-4">

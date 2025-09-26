@@ -1,21 +1,11 @@
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+FROM public.ecr.aws/lambda/python:3.11
 
 # Copy requirements first for better cache usage
-COPY requirements.txt .
+COPY requirements.txt ${LAMBDA_TASK_ROOT}
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY ./app ./app
+COPY ./app ${LAMBDA_TASK_ROOT}/app
 
-# Expose port
-EXPOSE 8000
-
-# Run the application
+# Set the CMD to your handler
 CMD ["app.lambda_handler.handler"]

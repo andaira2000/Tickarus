@@ -170,8 +170,10 @@ async def generate_test_data(
             "message": "Test data generated successfully",
             "tickets_created": result["tickets_created"],
             "similar_groups": result["similar_groups"],
-            "commit_failure_tickets": result.get("commit_failure_tickets", 0),
+            "commit_failure_tickets": result["commit_failure_tickets"],
             "test_dataset_id": result["dataset_id"],
+            "ticket_ids": result["ticket_ids"],
+            "evaluation_request": result["evaluation_request"],
         }
 
     except Exception as e:

@@ -62,37 +62,78 @@ class ComprehensiveEvaluationService:
         from uuid import uuid4
         import random
 
-        # Common ticket templates for similar groups
+        # Enhanced ticket templates matching auto-tagging service capabilities
+        # Tags aligned with tag_descriptions in auto_tagging_service.py
         ticket_templates = [
             {
-                "title_template": "Login authentication failure in {component}",
-                "description_template": "Users are unable to authenticate when accessing {component}. The login process fails with error code {error_code}. This appears to be related to {cause}.",
-                "tags": ["authentication", "login", "security"],
-                "priority": "high",
+                "title_template": "Database deadlock detected in {component}",
+                "description_template": "Critical database deadlock occurring in {component}. Tables {table1} and {table2} are locked. Transaction timeouts after {timeout}ms. This is blocking all {impact} operations in production.",
+                "tags": ["database", "bug"],
+                "priority": "critical",
+                "category": "database_critical",
             },
             {
-                "title_template": "Database connection timeout in {component}",
-                "description_template": "Application experiencing database timeouts in {component} module. Connection pool exhausted after {timeout}ms. Impact on {impact}.",
-                "tags": ["database", "performance", "timeout"],
-                "priority": "high",
+                "title_template": "Authentication service completely down",
+                "description_template": "The authentication service has crashed and is unavailable. All user login attempts are failing with 503 errors. This is a complete system outage affecting all users. Error: {error_details}.",
+                "tags": ["security", "backend", "bug"],
+                "priority": "critical",
+                "category": "auth_critical",
             },
             {
-                "title_template": "Memory leak detected in {component}",
-                "description_template": "Memory usage continuously increasing in {component}. Heap size grows from {start_size} to {end_size} over {duration}. Potential leak in {location}.",
-                "tags": ["memory", "performance", "leak"],
+                "title_template": "Memory leak causing performance issues in {component}",
+                "description_template": "Memory usage continuously growing in {component}. Performance degrading over time. Memory consumption increased from {start_size} to {end_size}. Users experiencing slow response times.",
+                "tags": ["performance", "backend"],
+                "priority": "high",
+                "category": "performance_issue",
+            },
+            {
+                "title_template": "API endpoint returning errors",
+                "description_template": "The {endpoint} API endpoint is returning {status_code} errors intermittently. Affecting {operations} functionality. Error rate is {error_rate}%. Investigation needed.",
+                "tags": ["api", "backend", "bug"],
+                "priority": "high",
+                "category": "api_error",
+            },
+            {
+                "title_template": "Frontend component not displaying correctly",
+                "description_template": "The {component} component has rendering issues in {browser}. CSS styles are broken and layout is distorted. This affects user experience for {user_group} users.",
+                "tags": ["frontend", "ui", "bug"],
                 "priority": "medium",
+                "category": "ui_bug",
             },
             {
-                "title_template": "API endpoint returning {status_code} error",
-                "description_template": "The {endpoint} endpoint is returning {status_code} errors. Affected operations: {operations}. Error occurs when {condition}.",
-                "tags": ["api", "http", "error"],
-                "priority": "high",
-            },
-            {
-                "title_template": "UI component not rendering properly",
-                "description_template": "The {component} component fails to render in {browser}. CSS styles not applying correctly. Affects {user_group} users.",
-                "tags": ["ui", "frontend", "rendering"],
+                "title_template": "Network connectivity timeout issues",
+                "description_template": "Experiencing intermittent network timeouts when connecting to {service}. Connection drops after {timeout} seconds. This affects {functionality} and causes user frustration.",
+                "tags": ["networking", "infrastructure"],
                 "priority": "medium",
+                "category": "network_issue",
+            },
+            {
+                "title_template": "Configuration error in {environment}",
+                "description_template": "Misconfiguration detected in {environment} environment. {config_item} is set incorrectly causing {issue_type}. Need to update {config_file} configuration.",
+                "tags": ["configuration", "infrastructure"],
+                "priority": "medium",
+                "category": "config_issue",
+            },
+            {
+                "title_template": "Add new feature: {feature_name}",
+                "description_template": "Request to implement {feature_name} functionality. This would improve user experience by {benefit}. Users have been requesting this for better {use_case}.",
+                "tags": ["feature"],
+                "priority": "low",
+                "category": "feature_request",
+            },
+            {
+                "title_template": "Update documentation for {component}",
+                "description_template": "The documentation for {component} is outdated and missing {missing_info}. Need to update with latest API changes and add examples for {use_cases}.",
+                "tags": ["documentation"],
+                "priority": "low",
+                "category": "docs_update",
+            },
+            {
+                "title_template": "Testing framework failing in CI",
+                "description_template": "Unit tests are failing in CI pipeline for {component}. Test suite shows {failure_count} failures. Need to fix {test_type} tests and update test configurations.",
+                "tags": ["testing", "infrastructure"],
+                "priority": "medium",
+                "category": "test_failure",
             },
         ]
 
@@ -111,7 +152,7 @@ class ComprehensiveEvaluationService:
                 .select("id, actor_type")
                 .eq("actor_type", "system")
                 .limit(5)
-            ).data2
+            ).data
 
         if not test_actors:
             raise Exception(
@@ -133,6 +174,10 @@ class ComprehensiveEvaluationService:
         created_tickets = []
         similar_groups = {}
 
+        # Initialize ground truth data for evaluation
+        ground_truth_tags = {}
+        ground_truth_priorities = {}
+
         # Create similar ticket groups
         for group_idx in range(num_similar_groups):
             template = random.choice(ticket_templates)
@@ -140,69 +185,131 @@ class ComprehensiveEvaluationService:
             group_tickets = []
 
             for i in range(tickets_in_group):
-                # Generate variations of the template
+                # Generate specific variations based on template needs
                 variations = {
                     "component": random.choice(
                         [
-                            "auth-service",
                             "user-service",
+                            "auth-service",
                             "payment-api",
+                            "notification-service",
                             "dashboard",
                             "mobile-app",
+                            "admin-panel",
+                            "report-engine",
                         ]
                     ),
-                    "error_code": random.choice(
-                        ["401", "500", "503", "timeout", "connection_failed"]
+                    "table1": random.choice(
+                        ["users", "orders", "payments", "sessions"]
                     ),
-                    "cause": random.choice(
-                        [
-                            "server overload",
-                            "network issues",
-                            "configuration error",
-                            "dependency failure",
-                        ]
+                    "table2": random.choice(
+                        ["profiles", "transactions", "logs", "audit"]
                     ),
-                    "timeout": random.choice(["5000", "10000", "30000"]),
+                    "timeout": random.choice(["5", "10", "30", "60"]),
                     "impact": random.choice(
                         [
                             "user registration",
                             "payment processing",
-                            "data sync",
-                            "reporting",
+                            "data synchronization",
+                            "report generation",
+                            "user authentication",
+                            "order processing",
                         ]
                     ),
-                    "start_size": f"{random.randint(100, 500)}MB",
-                    "end_size": f"{random.randint(1000, 5000)}MB",
-                    "duration": random.choice(["2 hours", "6 hours", "1 day"]),
-                    "location": random.choice(
-                        ["event listeners", "cache manager", "session handler"]
+                    "error_details": random.choice(
+                        [
+                            "OutOfMemoryError",
+                            "ConnectionTimeoutException",
+                            "NullPointerException",
+                            "DatabaseConnectionLost",
+                        ]
                     ),
-                    "status_code": random.choice(["404", "500", "502", "503"]),
+                    "start_size": f"{random.randint(200, 800)}MB",
+                    "end_size": f"{random.randint(2000, 8000)}MB",
+                    "status_code": random.choice(["404", "500", "502", "503", "504"]),
                     "endpoint": random.choice(
-                        ["/api/users", "/api/payments", "/api/auth", "/api/data"]
+                        [
+                            "/api/v1/users",
+                            "/api/v1/payments",
+                            "/api/v1/orders",
+                            "/api/v1/reports",
+                            "/api/v1/notifications",
+                        ]
                     ),
                     "operations": random.choice(
                         [
-                            "user creation",
-                            "data retrieval",
+                            "user registration",
+                            "payment processing",
+                            "order creation",
+                            "data export",
                             "file upload",
                             "authentication",
                         ]
                     ),
-                    "condition": random.choice(
-                        [
-                            "high load",
-                            "invalid input",
-                            "missing headers",
-                            "rate limiting",
-                        ]
-                    ),
+                    "error_rate": random.choice(["15", "25", "40", "60"]),
                     "browser": random.choice(["Chrome", "Firefox", "Safari", "Edge"]),
                     "user_group": random.choice(
                         ["mobile", "desktop", "admin", "premium"]
                     ),
+                    "service": random.choice(
+                        ["database", "redis-cache", "elasticsearch", "external-api"]
+                    ),
+                    "functionality": random.choice(
+                        ["search", "notifications", "real-time updates", "data sync"]
+                    ),
+                    "environment": random.choice(
+                        ["production", "staging", "development"]
+                    ),
+                    "config_item": random.choice(
+                        ["database_url", "redis_connection", "api_timeout", "log_level"]
+                    ),
+                    "issue_type": random.choice(
+                        [
+                            "connection failures",
+                            "performance degradation",
+                            "security vulnerabilities",
+                        ]
+                    ),
+                    "config_file": random.choice(
+                        [
+                            "application.yml",
+                            "database.conf",
+                            "nginx.conf",
+                            "env.properties",
+                        ]
+                    ),
+                    "feature_name": random.choice(
+                        [
+                            "dark mode",
+                            "bulk operations",
+                            "advanced filtering",
+                            "real-time chat",
+                        ]
+                    ),
+                    "benefit": random.choice(
+                        [
+                            "reducing eye strain",
+                            "improving productivity",
+                            "enhancing user control",
+                        ]
+                    ),
+                    "use_case": random.choice(
+                        ["accessibility", "power user workflows", "mobile experience"]
+                    ),
+                    "missing_info": random.choice(
+                        [
+                            "API endpoints",
+                            "configuration options",
+                            "error codes",
+                            "examples",
+                        ]
+                    ),
+                    "use_cases": random.choice(
+                        ["integration", "troubleshooting", "development setup"]
+                    ),
+                    "failure_count": random.choice(["3", "7", "12", "18"]),
+                    "test_type": random.choice(["integration", "unit", "end-to-end"]),
                 }
-
                 title = template["title_template"].format(**variations)
                 description = template["description_template"].format(**variations)
 
@@ -227,6 +334,10 @@ class ComprehensiveEvaluationService:
                 created_tickets.append(ticket.id)
                 group_tickets.append(str(ticket.id))
 
+                # Set ground truth for this ticket using the actual template used
+                ground_truth_tags[str(ticket.id)] = template["tags"]
+                ground_truth_priorities[str(ticket.id)] = template["priority"]
+
             similar_groups[f"group_{group_idx}"] = group_tickets
 
         # Create additional random tickets to reach target number
@@ -234,29 +345,128 @@ class ComprehensiveEvaluationService:
         for i in range(remaining_tickets):
             template = random.choice(ticket_templates)
             variations = {
-                "component": f"service-{random.randint(1, 20)}",
-                "error_code": f"error_{random.randint(1000, 9999)}",
-                "cause": f"unknown issue {random.randint(1, 100)}",
-                "timeout": f"{random.randint(1000, 60000)}",
-                "impact": f"functionality {random.randint(1, 20)}",
-                "start_size": f"{random.randint(100, 500)}MB",
-                "end_size": f"{random.randint(1000, 5000)}MB",
-                "duration": random.choice(["2 hours", "6 hours", "1 day"]),
-                "location": random.choice(
-                    ["event listeners", "cache manager", "session handler"]
+                "component": random.choice(
+                    [
+                        "user-service",
+                        "auth-service",
+                        "payment-api",
+                        "notification-service",
+                        "dashboard",
+                        "mobile-app",
+                        "admin-panel",
+                        "report-engine",
+                    ]
                 ),
-                "status_code": random.choice(["404", "500", "502", "503"]),
+                "table1": random.choice(
+                    ["users", "orders", "payments", "sessions"]
+                ),
+                "table2": random.choice(
+                    ["profiles", "transactions", "logs", "audit"]
+                ),
+                "timeout": random.choice(["5", "10", "30", "60"]),
+                "impact": random.choice(
+                    [
+                        "user registration",
+                        "payment processing",
+                        "data synchronization",
+                        "report generation",
+                        "user authentication",
+                        "order processing",
+                    ]
+                ),
+                "error_details": random.choice(
+                    [
+                        "OutOfMemoryError",
+                        "ConnectionTimeoutException",
+                        "NullPointerException",
+                        "DatabaseConnectionLost",
+                    ]
+                ),
+                "start_size": f"{random.randint(200, 800)}MB",
+                "end_size": f"{random.randint(2000, 8000)}MB",
+                "status_code": random.choice(["404", "500", "502", "503", "504"]),
                 "endpoint": random.choice(
-                    ["/api/users", "/api/payments", "/api/auth", "/api/data"]
+                    [
+                        "/api/v1/users",
+                        "/api/v1/payments",
+                        "/api/v1/orders",
+                        "/api/v1/reports",
+                        "/api/v1/notifications",
+                    ]
                 ),
                 "operations": random.choice(
-                    ["user creation", "data retrieval", "file upload", "authentication"]
+                    [
+                        "user registration",
+                        "payment processing",
+                        "order creation",
+                        "data export",
+                        "file upload",
+                        "authentication",
+                    ]
                 ),
-                "condition": random.choice(
-                    ["high load", "invalid input", "missing headers", "rate limiting"]
-                ),
+                "error_rate": random.choice(["15", "25", "40", "60"]),
                 "browser": random.choice(["Chrome", "Firefox", "Safari", "Edge"]),
-                "user_group": random.choice(["mobile", "desktop", "admin", "premium"]),
+                "user_group": random.choice(
+                    ["mobile", "desktop", "admin", "premium"]
+                ),
+                "service": random.choice(
+                    ["database", "redis-cache", "elasticsearch", "external-api"]
+                ),
+                "functionality": random.choice(
+                    ["search", "notifications", "real-time updates", "data sync"]
+                ),
+                "environment": random.choice(
+                    ["production", "staging", "development"]
+                ),
+                "config_item": random.choice(
+                    ["database_url", "redis_connection", "api_timeout", "log_level"]
+                ),
+                "issue_type": random.choice(
+                    [
+                        "connection failures",
+                        "performance degradation",
+                        "security vulnerabilities",
+                    ]
+                ),
+                "config_file": random.choice(
+                    [
+                        "application.yml",
+                        "database.conf",
+                        "nginx.conf",
+                        "env.properties",
+                    ]
+                ),
+                "feature_name": random.choice(
+                    [
+                        "dark mode",
+                        "bulk operations",
+                        "advanced filtering",
+                        "real-time chat",
+                    ]
+                ),
+                "benefit": random.choice(
+                    [
+                        "reducing eye strain",
+                        "improving productivity",
+                        "enhancing user control",
+                    ]
+                ),
+                "use_case": random.choice(
+                    ["accessibility", "power user workflows", "mobile experience"]
+                ),
+                "missing_info": random.choice(
+                    [
+                        "API endpoints",
+                        "configuration options",
+                        "error codes",
+                        "examples",
+                    ]
+                ),
+                "use_cases": random.choice(
+                    ["integration", "troubleshooting", "development setup"]
+                ),
+                "failure_count": random.choice(["3", "7", "12", "18"]),
+                "test_type": random.choice(["integration", "unit", "end-to-end"]),
             }
 
             title = template["title_template"].format(**variations) + f" - Random {i}"
@@ -278,6 +488,10 @@ class ComprehensiveEvaluationService:
                 ticket_payload, actor_id, client=c
             )
             created_tickets.append(ticket.id)
+
+            # Set ground truth for this ticket using the actual template used
+            ground_truth_tags[str(ticket.id)] = template["tags"]
+            ground_truth_priorities[str(ticket.id)] = template["priority"]
 
         # Generate commit failure tickets if requested
         commit_failure_tickets = 0
@@ -331,12 +545,35 @@ class ComprehensiveEvaluationService:
             )
         )
 
+        # Build evaluation data for response
+        all_ticket_ids = [str(tid) for tid in created_tickets]
+
+
+        # Add ground truth for CI failure tickets
+        if include_commit_failures:
+            # Get the CI failure tickets (they were added last)
+            ci_tickets = (
+                created_tickets[-commit_failure_tickets:]
+                if commit_failure_tickets > 0
+                else []
+            )
+            for ticket_id in ci_tickets:
+                ground_truth_tags[str(ticket_id)] = ["testing", "infrastructure"]
+                ground_truth_priorities[str(ticket_id)] = "medium"
+
+
         return {
             "dataset_id": str(dataset_id),
             "tickets_created": len(created_tickets),
             "similar_groups": similar_groups,
             "commit_failure_tickets": commit_failure_tickets,
-            "ticket_ids": [str(tid) for tid in created_tickets],
+            "ticket_ids": all_ticket_ids,
+            # Ready-to-use evaluation request format
+            "evaluation_request": {
+                "test_ticket_ids": all_ticket_ids,
+                "ground_truth_tags": ground_truth_tags,
+                "ground_truth_priorities": ground_truth_priorities,
+            },
         }
 
     async def evaluate_similarity_accuracy(

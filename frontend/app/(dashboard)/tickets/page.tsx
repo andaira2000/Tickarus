@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
-import { Search, Filter, Plus, Eye, SortAsc, SortDesc, Clock, User, MessageSquare } from 'lucide-react';
+import { Search, Filter, SortAsc, SortDesc, List, User, Eye, Tag, Clock, AlertCircle, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,44 +10,148 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TicketCreator } from '@/components/ui/ticket-creator';
 import { apiClient } from '@/lib/api';
 import { TicketFilters, TicketPriority, TicketStatus } from '@/lib/types';
+import { useAuthStore } from '@/lib/store/auth';
 
 function TicketsContent() {
-  const [filters, setFilters] = useState<TicketFilters>({
-    page: 1,
-    page_size: 20,
-  });
+  const { user } = useAuthStore();
+  const [activeTab, setActiveTab] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('created');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 15;
 
-  const { data: tickets, isLoading } = useQuery({
-    queryKey: ['tickets', filters],
-    queryFn: () => apiClient.getTickets(filters),
+  // Build filters for API calls
+  const buildFilters = (extraFilters = {}) => ({
+    page: currentPage,
+    page_size: pageSize,
+    q: searchQuery || undefined,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    priority: priorityFilter !== 'all' ? priorityFilter : undefined,
+    ...extraFilters,
   });
 
-  const { data: teams } = useQuery({
-    queryKey: ['teams'],
-    queryFn: () => apiClient.getTeams(),
+  // Fetch all tickets
+  const { data: allTicketsData, isLoading: isLoadingAll } = useQuery({
+    queryKey: ['tickets', 'all', currentPage, searchQuery, statusFilter, priorityFilter],
+    queryFn: () => apiClient.getTickets(buildFilters()),
+    enabled: activeTab === 'all',
   });
 
-  const handleFilterChange = (key: keyof TicketFilters, value: string | number | undefined) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value,
-      page: 1, // Reset to first page when filtering
-    }));
+  // Fetch my tickets
+  const { data: myCreatedTickets, isLoading: isLoadingCreated } = useQuery({
+    queryKey: ['tickets', 'created', user?.id, currentPage, searchQuery, statusFilter, priorityFilter],
+    queryFn: () => apiClient.getTickets(buildFilters({
+      created_by_me: true,
+    })),
+    enabled: !!user?.id && activeTab === 'my',
+  });
+
+  const { data: myAssignedTickets, isLoading: isLoadingAssigned } = useQuery({
+    queryKey: ['tickets', 'assigned', user?.id, currentPage, searchQuery, statusFilter, priorityFilter],
+    queryFn: () => apiClient.getTickets(buildFilters({
+      assignee_id: user!.id,
+    })),
+    enabled: !!user?.id && activeTab === 'my',
+  });
+
+  // Get current data based on active tab
+  const currentData = useMemo(() => {
+    if (activeTab === 'my') {
+      // For my tickets, we'll use the created tickets as primary and show stats
+      return myCreatedTickets;
+    }
+    return allTicketsData;
+  }, [activeTab, allTicketsData, myCreatedTickets]);
+
+  const currentTickets = currentData?.tickets || [];
+
+  // Since API handles filtering, we just use the tickets directly
+  const filteredAndSortedTickets = currentTickets;
+
+  // Calculate counts (fetch totals without filters for accurate counts)
+  const { data: allTicketsCount } = useQuery({
+    queryKey: ['tickets', 'count', 'all'],
+    queryFn: () => apiClient.getTickets({ page: 1, page_size: 1 }),
+  });
+
+  const { data: myTicketsCount } = useQuery({
+    queryKey: ['tickets', 'count', 'my', user?.id],
+    queryFn: () => apiClient.getTickets({ created_by_me: true, page: 1, page_size: 1 }),
+    enabled: !!user?.id,
+  });
+
+  const ticketCounts = useMemo(() => {
+    const allCount = allTicketsCount?.total || 0;
+    const myCount = myTicketsCount?.total || 0;
+    return { all: allCount, my: myCount };
+  }, [allTicketsCount, myTicketsCount]);
+
+  // Status counts for current view
+  const statusCounts = useMemo(() => {
+    const counts = filteredAndSortedTickets.reduce((acc, ticket) => {
+      acc[ticket.status] = (acc[ticket.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      all: filteredAndSortedTickets.length,
+      open: counts.open || 0,
+      in_progress: counts.in_progress || 0,
+      in_review: counts.in_review || 0,
+      resolved: counts.resolved || 0,
+      closed: counts.closed || 0,
+    };
+  }, [filteredAndSortedTickets]);
+
+  // My tickets stats (for My Tickets view)
+  const myTicketStats = useMemo(() => {
+    if (activeTab !== 'my') return null;
+
+    const myTickets = currentTickets;
+    const reportedByMe = myCreatedTickets?.tickets || [];
+    const assignedToMe = myAssignedTickets?.tickets || [];
+
+    return {
+      total: myTickets.length,
+      reported: reportedByMe.length,
+      assigned: assignedToMe.length,
+      open: myTickets.filter(t => t.status === 'open').length,
+      inProgress: myTickets.filter(t => t.status === 'in_progress').length,
+      closed: myTickets.filter(t => t.status === 'closed' || t.status === 'resolved').length,
+      urgent: myTickets.filter(t => t.priority === 'critical').length,
+      high: myTickets.filter(t => t.priority === 'high').length
+    };
+  }, [activeTab, currentTickets, myCreatedTickets, myAssignedTickets]);
+
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
   };
 
-  const handleSearch = (query: string) => {
-    setFilters(prev => ({
-      ...prev,
-      q: query || undefined,
-      page: 1,
-    }));
+  // Reset to page 1 when filters change
+  const handleFilterChange = (newFilters: any) => {
+    setCurrentPage(1);
+    if (newFilters.searchQuery !== undefined) setSearchQuery(newFilters.searchQuery);
+    if (newFilters.statusFilter !== undefined) setStatusFilter(newFilters.statusFilter);
+    if (newFilters.priorityFilter !== undefined) setPriorityFilter(newFilters.priorityFilter);
   };
+
+  // Reset to page 1 when tab changes
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    setCurrentPage(1);
+  };
+
+  // Pagination calculations
+  const totalPages = Math.ceil((currentData?.total || 0) / pageSize);
+  const hasNextPage = currentPage < totalPages;
+  const hasPrevPage = currentPage > 1;
 
   const getPriorityColor = (priority: TicketPriority) => {
     switch (priority) {
@@ -83,7 +186,7 @@ function TicketsContent() {
   };
 
   const formatStatus = (status: TicketStatus) => {
-    return status.split('_').map(word => 
+    return status.split('_').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
   };
@@ -92,37 +195,152 @@ function TicketsContent() {
     return priority.charAt(0).toUpperCase() + priority.slice(1);
   };
 
-  const getStatusCounts = () => {
-    const counts = tickets?.tickets?.reduce((acc, ticket) => {
-      acc[ticket.status] = (acc[ticket.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>) || {};
-
-    return {
-      all: tickets?.total || 0,
-      open: counts.open || 0,
-      in_progress: counts.in_progress || 0,
-      resolved: counts.resolved || 0,
-      closed: counts.closed || 0
-    };
-  };
-
-  const statusCounts = getStatusCounts();
-
-  const toggleSortOrder = () => {
-    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-  };
+  const isLoading = activeTab === 'all' ? isLoadingAll : (isLoadingCreated || isLoadingAssigned);
 
   return (
     <>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">All Tickets</h1>
+        <h1 className="text-3xl font-bold text-gray-900">
+          {activeTab === 'my' ? 'My Tickets' : 'Ticket Management System'}
+        </h1>
         <p className="mt-2 text-gray-600">
-          Manage and track tickets across all teams
+          {activeTab === 'my'
+            ? 'View and manage tickets assigned to you or created by you'
+            : 'Manage your support tickets with AI-powered assistance'
+          }
         </p>
       </div>
 
-      {/* Header with counts */}
+      {/* Tab Navigation */}
+      <div className="mb-8">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="all" className="flex items-center gap-2">
+              <List className="w-4 h-4" />
+              All Tickets
+              <Badge variant="secondary" className="ml-1">
+                {ticketCounts.all}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="my" className="flex items-center gap-2">
+              <User className="w-4 h-4" />
+              My Tickets
+              <Badge variant="secondary" className="ml-1">
+                {ticketCounts.my}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* My Tickets Stats */}
+      {activeTab === 'my' && myTicketStats && (
+        <div className="space-y-6 mb-8">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total</CardTitle>
+                <User className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{myTicketStats.total}</div>
+                <p className="text-xs text-muted-foreground">Your tickets</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Reported</CardTitle>
+                <AlertCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{myTicketStats.reported}</div>
+                <p className="text-xs text-muted-foreground">Tickets you created</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Assigned</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{myTicketStats.assigned}</div>
+                <p className="text-xs text-muted-foreground">Tickets assigned to you</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Completed</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{myTicketStats.closed}</div>
+                <p className="text-xs text-muted-foreground">Closed tickets</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Priority and Status Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Priority Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <span className="text-sm">Critical</span>
+                  </div>
+                  <Badge variant={myTicketStats.urgent > 0 ? "destructive" : "secondary"}>
+                    {myTicketStats.urgent}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                    <span className="text-sm">High</span>
+                  </div>
+                  <Badge variant={myTicketStats.high > 0 ? "destructive" : "secondary"}>
+                    {myTicketStats.high}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Status Overview</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Open</span>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                    {myTicketStats.open}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">In Progress</span>
+                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                    {myTicketStats.inProgress}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Closed</span>
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    {myTicketStats.closed}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Status Count Badges */}
       <div className="flex flex-wrap gap-4 mb-6">
         <Badge variant="outline" className="px-3 py-1">
           All: {statusCounts.all}
@@ -132,6 +350,9 @@ function TicketsContent() {
         </Badge>
         <Badge variant="outline" className="px-3 py-1 bg-yellow-50 text-yellow-700 border-yellow-200">
           In Progress: {statusCounts.in_progress}
+        </Badge>
+        <Badge variant="outline" className="px-3 py-1 bg-purple-50 text-purple-700 border-purple-200">
+          In Review: {statusCounts.in_review}
         </Badge>
         <Badge variant="outline" className="px-3 py-1 bg-green-50 text-green-700 border-green-200">
           Resolved: {statusCounts.resolved}
@@ -146,36 +367,18 @@ function TicketsContent() {
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Search tickets by title, description, tags, or reporter..."
-            value={filters.q || ''}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="pl-10"
+            placeholder="Search tickets by title, description, tags..."
+            value={searchQuery}
+            onChange={(e) => handleFilterChange({ searchQuery: e.target.value })}
+            className="pl-10 bg-input-background"
           />
         </div>
 
         <div className="flex gap-2">
-          <Select value={filters.team_id || 'all'} onValueChange={(value) =>
-            handleFilterChange('team_id', value === 'all' ? undefined : value)
-          }>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="All Teams" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Teams</SelectItem>
-              {teams?.map((team) => (
-                <SelectItem key={team.id} value={team.id}>
-                  {team.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={filters.status || 'all'} onValueChange={(value) =>
-            handleFilterChange('status', value === 'all' ? undefined : value)
-          }>
-            <SelectTrigger className="w-[140px]">
+          <Select value={statusFilter} onValueChange={(value) => handleFilterChange({ statusFilter: value })}>
+            <SelectTrigger className="w-[140px] bg-input-background">
               <Filter className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="All Status" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
@@ -187,11 +390,9 @@ function TicketsContent() {
             </SelectContent>
           </Select>
 
-          <Select value={filters.priority || 'all'} onValueChange={(value) =>
-            handleFilterChange('priority', value === 'all' ? undefined : value)
-          }>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="All Priority" />
+          <Select value={priorityFilter} onValueChange={(value) => handleFilterChange({ priorityFilter: value })}>
+            <SelectTrigger className="w-[140px] bg-input-background">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Priority</SelectItem>
@@ -203,7 +404,7 @@ function TicketsContent() {
           </Select>
 
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[120px]">
+            <SelectTrigger className="w-[120px] bg-input-background">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -222,103 +423,150 @@ function TicketsContent() {
       </div>
 
       {/* Results count */}
-      <div className="text-sm text-muted-foreground mb-4">
-        Showing {tickets?.tickets?.length || 0} of {tickets?.total || 0} tickets
+      <div className="text-sm text-muted-foreground mb-6">
+        Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, currentData?.total || 0)} of {currentData?.total || 0} tickets
       </div>
 
       {/* Tickets List */}
       <div className="space-y-4">
-        {tickets?.tickets?.map((ticket) => (
-          <Card key={ticket.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = `/tickets/${ticket.id}`}>
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="mb-2 text-lg font-medium">{ticket.title}</h3>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <div className={`w-2 h-2 rounded-full ${getPriorityColor(ticket.priority)}`}></div>
-                    <span className="capitalize">{formatPriority(ticket.priority)} Priority</span>
-                    <span>•</span>
-                    <Badge variant="secondary" className={getStatusColor(ticket.status)}>
-                      {formatStatus(ticket.status)}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  #{ticket.id.slice(-6)}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                {ticket.description}
-              </p>
-
-              {ticket.tags && ticket.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-3">
-                  {ticket.tags.map((tag) => (
-                    <Badge key={tag} variant="outline" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1">
-                    <User className="w-3 h-3" />
-                    <span>{ticket.creator_name || 'Unknown'}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>Team: {ticket.team_name}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <MessageSquare className="w-3 h-3" />
-                  <span>{ticket.comments_count || 0} comments</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-        {(!tickets?.tickets || tickets.tickets.length === 0) && (
+        {filteredAndSortedTickets.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
               <Search className="w-8 h-8 text-gray-400" />
             </div>
-            <h3 className="text-lg mb-2">No tickets found</h3>
+            <h3 className="text-lg mb-2">{isLoading ? 'Loading tickets...' : 'No tickets found'}</h3>
             <p className="text-muted-foreground">
-              {isLoading ? 'Loading tickets...' : 'Try adjusting your search or filters'}
+              {isLoading ? 'Please wait while we fetch your tickets' :
+               (searchQuery || statusFilter !== "all" || priorityFilter !== "all"
+                ? "Try adjusting your search or filters"
+                : "Create your first ticket to get started")}
             </p>
           </div>
+        ) : (
+          filteredAndSortedTickets.map((ticket) => (
+            <Card
+              key={ticket.id}
+              className="shadow-md hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={() => window.open(`/tickets/${ticket.id}`, '_self')}
+            >
+              <CardContent className="p-0">
+                {/* Title and ID row */}
+                <div className="flex items-start justify-between p-6 pb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 flex-1 pr-4">
+                    {ticket.title}
+                  </h3>
+                  <span className="text-sm text-gray-500 font-mono whitespace-nowrap">
+                    #{ticket.id}
+                  </span>
+                </div>
+
+                {/* Main content */}
+                <div className="px-6 space-y-4">
+                  {/* Priority and Status row */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${getPriorityColor(ticket.priority)}`}></div>
+                      <span className="text-sm capitalize font-medium">{formatPriority(ticket.priority)}</span>
+                    </div>
+                    <Badge variant="secondary" className={getStatusColor(ticket.status)}>
+                      {formatStatus(ticket.status)}
+                    </Badge>
+                  </div>
+
+                  {/* Description */}
+                  <p className="text-gray-600 line-clamp-2 leading-relaxed">
+                    {ticket.description}
+                  </p>
+
+                  {/* Tags */}
+                  {ticket.tags && ticket.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {ticket.tags.slice(0, 3).map((tag) => (
+                        <Badge key={tag} variant="outline" className="text-xs">
+                          <Tag className="w-3 h-3 mr-1" />
+                          {tag}
+                        </Badge>
+                      ))}
+                      {ticket.tags.length > 3 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{ticket.tags.length - 3} more
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Meta information */}
+                <div className="flex items-center gap-4 text-sm text-gray-500 px-6 py-4 mt-4 border-t border-gray-100 bg-gray-50/50">
+                  <TicketCreator ticket={ticket} showAvatar={false} />
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <User className="w-4 h-4" />
+                    <span>{ticket.team_name}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
         )}
       </div>
 
       {/* Pagination */}
-      {tickets && tickets.total > tickets.page_size && (
-        <div className="mt-6 flex justify-center">
-          <div className="flex items-center space-x-2">
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-8">
+          <div className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </div>
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              disabled={filters.page === 1}
-              onClick={() => handleFilterChange('page', (filters.page || 1) - 1)}
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={!hasPrevPage}
             >
+              <ChevronLeft className="w-4 h-4 mr-1" />
               Previous
             </Button>
-            <span className="text-sm text-gray-600">
-              Page {filters.page || 1} of {Math.ceil(tickets.total / tickets.page_size)}
-            </span>
+
+            {/* Page numbers */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNum)}
+                    className="w-8 h-8 p-0"
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+
             <Button
               variant="outline"
-              disabled={(filters.page || 1) >= Math.ceil(tickets.total / tickets.page_size)}
-              onClick={() => handleFilterChange('page', (filters.page || 1) + 1)}
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={!hasNextPage}
             >
               Next
+              <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           </div>
         </div>

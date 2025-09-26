@@ -13,8 +13,8 @@ import {
   LogOut,
   Plus,
   Bell,
-  Menu,
-  X
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -40,24 +40,14 @@ const navigation = [
     icon: LayoutDashboard,
   },
   {
-    name: 'All Tickets',
+    name: 'Tickets',
     href: '/tickets',
-    icon: Ticket,
-  },
-  {
-    name: 'My Tickets',
-    href: '/tickets/my',
     icon: Ticket,
   },
   {
     name: 'Teams',
     href: '/teams',
     icon: Users,
-  },
-  {
-    name: 'Search',
-    href: '/search',
-    icon: Search,
   },
 ];
 
@@ -130,17 +120,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className={`fixed inset-y-0 z-50 flex ${sidebarOpen ? 'w-64' : 'w-16'} flex-col transition-all duration-300 ease-in-out`}>
         <div className={`flex grow flex-col gap-y-5 overflow-y-auto bg-white py-4 shadow-sm ${sidebarOpen ? 'px-6' : 'px-2'} transition-all duration-300`}>
           {/* Logo and Toggle */}
-          <div className="flex h-16 shrink-0 items-center justify-between">
+          <div className={`flex h-16 shrink-0 items-center ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
             {sidebarOpen && (
               <h1 className="text-2xl font-bold text-blue-600">Tickarus</h1>
             )}
             <Button
               variant="ghost"
-              size="sm"
               onClick={toggleSidebar}
-              className="hover:bg-gray-100"
+              className={`hover:bg-gray-100 rounded-md p-2 ${sidebarOpen ? '' : 'w-12 h-12'}`}
             >
-              {sidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              {sidebarOpen ? <ChevronLeft className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />}
             </Button>
           </div>
 

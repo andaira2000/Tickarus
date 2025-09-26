@@ -5,15 +5,24 @@ import logging
 
 from app.config import settings
 from app.db.database import init_supabase
-from app.api.routes import auth, tickets, comments, tags, teams, github, metrics, ai_chat
+from app.api.routes import (
+    auth,
+    tickets,
+    comments,
+    tags,
+    teams,
+    github,
+    metrics,
+    ai_chat,
+)
 from app.api import evaluation
 from app.services.llm_interface import (
-    initialize_llm_service, OpenAIProvider, AnthropicProvider, MockLLMProvider
+    initialize_llm_service,
+    OpenAIProvider,
+    AnthropicProvider,
+    MockLLMProvider,
 )
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
 logger = logging.getLogger(__name__)
 
 
@@ -26,16 +35,18 @@ async def lifespan(app: FastAPI):
     try:
         if settings.llm_provider == "openai" and settings.openai_api_key:
             provider = OpenAIProvider(
-                api_key=settings.openai_api_key,
-                model=settings.openai_model
+                api_key=settings.openai_api_key, model=settings.openai_model
             )
-            logger.info(f"Initialized OpenAI provider with model {settings.openai_model}")
+            logger.info(
+                f"Initialized OpenAI provider with model {settings.openai_model}"
+            )
         elif settings.llm_provider == "anthropic" and settings.anthropic_api_key:
             provider = AnthropicProvider(
-                api_key=settings.anthropic_api_key,
-                model=settings.anthropic_model
+                api_key=settings.anthropic_api_key, model=settings.anthropic_model
             )
-            logger.info(f"Initialized Anthropic provider with model {settings.anthropic_model}")
+            logger.info(
+                f"Initialized Anthropic provider with model {settings.anthropic_model}"
+            )
         else:
             provider = MockLLMProvider()
             logger.info("Initialized Mock LLM provider (no API costs)")

@@ -162,7 +162,7 @@ export interface ChatMessage {
   session_id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   token_count?: number;
   created_at: string;
 }
@@ -181,5 +181,5 @@ export interface ChatMessageCreate {
 export interface ChatResponse {
   message: ChatMessage;
   session_updated: boolean;
-  context_used?: Record<string, any>;
+  context_used?: Record<string, unknown>;
 }

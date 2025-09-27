@@ -17,11 +17,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Separator } from '@/components/ui/separator';
-import { TicketCreator, TicketCreatorBadge } from '@/components/ui/ticket-creator';
+import { TicketCreator } from '@/components/ui/ticket-creator';
 import { AIChat } from '@/components/ui/ai-chat';
 import { AIAnalysis } from '@/components/ui/ai-analysis';
 import { apiClient } from '@/lib/api';
-import { TicketPriority, TicketStatus } from '@/lib/types';
+import { Comment, TicketPriority, TicketStatus } from '@/lib/types';
 
 const commentSchema = z.object({
   content: z.string().min(1, 'Comment cannot be empty'),
@@ -143,7 +143,7 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
     return priority.charAt(0).toUpperCase() + priority.slice(1);
   };
 
-  const isAIAssistantComment = (comment: any) => {
+  const isAIAssistantComment = (comment: Comment) => {
     return comment.author_info?.system_user_type === 'ai_assistant';
   };
 

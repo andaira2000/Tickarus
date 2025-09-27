@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Ticket, Users, Clock, CheckCircle, Tag } from 'lucide-react';
+import { Ticket, Users, Clock, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 
 import { DashboardLayout } from '@/components/layouts/dashboard-layout';

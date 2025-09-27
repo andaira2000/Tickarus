@@ -203,8 +203,8 @@ export function SimilaritySuggestions({ title, description, className }: Similar
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Badge variant="secondary" className={`${getStatusColor(ticket.status)} text-xs`}>
-                    {formatStatus(ticket.status)}
+                  <Badge variant="secondary" className={`${getStatusColor(ticket.status as TicketStatus)} text-xs`}>
+                    {formatStatus(ticket.status as TicketStatus)}
                   </Badge>
                   <span className="text-xs text-muted-foreground">
                     {ticket.team_name}

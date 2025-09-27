@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Filter, SortAsc, SortDesc, List, User, Eye, Tag, Clock, AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { Search, Filter, SortAsc, SortDesc, List, User, Tag, Clock, AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 
 import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TicketCreator } from '@/components/ui/ticket-creator';
 import { apiClient } from '@/lib/api';
-import { TicketFilters, TicketPriority, TicketStatus } from '@/lib/types';
+import { TicketPriority, TicketStatus } from '@/lib/types';
 import { useAuthStore } from '@/lib/store/auth';
 
 function TicketsContent() {
@@ -42,8 +42,8 @@ function TicketsContent() {
     page: currentPage,
     page_size: pageSize,
     q: debouncedSearchQuery || undefined,
-    status: statusFilter !== 'all' ? statusFilter : undefined,
-    priority: priorityFilter !== 'all' ? priorityFilter : undefined,
+    status: statusFilter !== 'all' ? (statusFilter as TicketStatus) : undefined,
+    priority: priorityFilter !== 'all' ? (priorityFilter as TicketPriority) : undefined,
     ...extraFilters,
   });
 
@@ -80,7 +80,9 @@ function TicketsContent() {
     return allTicketsData;
   }, [activeTab, allTicketsData, myCreatedTickets]);
 
-  const currentTickets = currentData?.tickets || [];
+  const currentTickets = useMemo(() => {
+    return currentData?.tickets || [];
+  }, [currentData]);
 
   // Apply client-side sorting since API doesn't support sorting parameters
   const filteredAndSortedTickets = useMemo(() => {
@@ -157,7 +159,11 @@ function TicketsContent() {
   };
 
   // Reset to page 1 when filters change
-  const handleFilterChange = (newFilters: any) => {
+  const handleFilterChange = (newFilters: {
+    searchQuery?: string;
+    statusFilter?: string;
+    priorityFilter?: string;
+  }) => {
     setCurrentPage(1);
     if (newFilters.searchQuery !== undefined) setSearchQuery(newFilters.searchQuery);
     if (newFilters.statusFilter !== undefined) setStatusFilter(newFilters.statusFilter);

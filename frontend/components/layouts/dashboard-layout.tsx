@@ -122,7 +122,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Logo and Toggle */}
           <div className={`flex h-16 shrink-0 items-center ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
             {sidebarOpen && (
-              <h1 className="text-2xl font-bold text-blue-600">Tickarus</h1>
+              <h1 className="text-2xl font-bold text-teal-600 text-center">Tickarus</h1>
             )}
             <Button
               variant="ghost"
@@ -135,8 +135,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Create Ticket Button */}
           <Link href="/tickets/new">
-            <Button className={`w-full ${sidebarOpen ? 'justify-start' : 'justify-center'}`} size="sm">
-              <Plus className={`h-4 w-4 ${sidebarOpen ? 'mr-2' : ''}`} />
+            <Button className={`w-full ${sidebarOpen ? 'justify-start gap-x-3' : 'justify-center'} p-2 text-sm leading-6 font-semibold`}>
+              <Plus className="h-6 w-6 shrink-0" />
               {sidebarOpen && 'New Ticket'}
             </Button>
           </Link>

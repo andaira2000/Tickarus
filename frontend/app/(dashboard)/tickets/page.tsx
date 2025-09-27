@@ -72,8 +72,20 @@ function TicketsContent() {
 
   const currentTickets = currentData?.tickets || [];
 
-  // Since API handles filtering, we just use the tickets directly
-  const filteredAndSortedTickets = currentTickets;
+  // Apply client-side sorting since API doesn't support sorting parameters
+  const filteredAndSortedTickets = useMemo(() => {
+    const sorted = [...currentTickets].sort((a, b) => {
+      const dateA = new Date(a.created_at).getTime();
+      const dateB = new Date(b.created_at).getTime();
+
+      if (sortOrder === 'desc') {
+        return dateB - dateA; // Newest first
+      } else {
+        return dateA - dateB; // Oldest first
+      }
+    });
+    return sorted;
+  }, [currentTickets, sortOrder]);
 
   // Calculate counts (fetch totals without filters for accurate counts)
   const { data: allTicketsCount } = useQuery({

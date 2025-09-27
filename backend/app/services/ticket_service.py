@@ -203,17 +203,23 @@ class TicketService:
                 return {"tickets": [], "total": 0, "page": page, "page_size": page_size}
             q = q.in_("id", tids)
 
-        # Apply search before pagination
-        if search_query:
-            # Use case-insensitive search on title and description
-            q = q.or_(f"title.ilike.%{search_query}%,description.ilike.%{search_query}%")
-
-        # Apply ordering and pagination
+        # Apply ordering first
         q = q.order("last_activity_at", desc=True)
 
-        from_ = (page - 1) * page_size
-        to_ = from_ + (page_size - 1)
-        q = q.range(from_, to_)
+        # Apply search and pagination
+        if search_query:
+            # Use text_search with the search_tsv column
+            q = q.text_search(
+                "search_tsv", f"'{search_query}'", options={"config": "english"}
+            )
+            # SyncFilterRequestBuilder doesn't have pagination methods
+            # Need to add pagination via params manually
+            offset = (page - 1) * page_size
+            q.params = q.params.add("limit", str(page_size)).add("offset", str(offset))
+        else:
+            # Apply pagination for regular SyncSelectRequestBuilder
+            offset = (page - 1) * page_size
+            q = q.limit(page_size).offset(offset)
 
         resp = exec_query(q)
         data = resp.data or []

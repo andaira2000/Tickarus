@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Filter, SortAsc, SortDesc, List, User, Eye, Tag, Clock, AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 
@@ -20,6 +20,7 @@ function TicketsContent() {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('created');
@@ -27,11 +28,20 @@ function TicketsContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 15;
 
+  // Debounce search query - update debouncedSearchQuery after 1.5s of no typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Build filters for API calls
   const buildFilters = (extraFilters = {}) => ({
     page: currentPage,
     page_size: pageSize,
-    q: searchQuery || undefined,
+    q: debouncedSearchQuery || undefined,
     status: statusFilter !== 'all' ? statusFilter : undefined,
     priority: priorityFilter !== 'all' ? priorityFilter : undefined,
     ...extraFilters,
@@ -39,14 +49,14 @@ function TicketsContent() {
 
   // Fetch all tickets
   const { data: allTicketsData, isLoading: isLoadingAll } = useQuery({
-    queryKey: ['tickets', 'all', currentPage, searchQuery, statusFilter, priorityFilter],
+    queryKey: ['tickets', 'all', currentPage, debouncedSearchQuery, statusFilter, priorityFilter],
     queryFn: () => apiClient.getTickets(buildFilters()),
     enabled: activeTab === 'all',
   });
 
   // Fetch my tickets
   const { data: myCreatedTickets, isLoading: isLoadingCreated } = useQuery({
-    queryKey: ['tickets', 'created', user?.id, currentPage, searchQuery, statusFilter, priorityFilter],
+    queryKey: ['tickets', 'created', user?.id, currentPage, debouncedSearchQuery, statusFilter, priorityFilter],
     queryFn: () => apiClient.getTickets(buildFilters({
       created_by_me: true,
     })),
@@ -54,7 +64,7 @@ function TicketsContent() {
   });
 
   const { data: myAssignedTickets, isLoading: isLoadingAssigned } = useQuery({
-    queryKey: ['tickets', 'assigned', user?.id, currentPage, searchQuery, statusFilter, priorityFilter],
+    queryKey: ['tickets', 'assigned', user?.id, currentPage, debouncedSearchQuery, statusFilter, priorityFilter],
     queryFn: () => apiClient.getTickets(buildFilters({
       assignee_id: user!.id,
     })),
@@ -153,6 +163,14 @@ function TicketsContent() {
     if (newFilters.statusFilter !== undefined) setStatusFilter(newFilters.statusFilter);
     if (newFilters.priorityFilter !== undefined) setPriorityFilter(newFilters.priorityFilter);
   };
+
+  // Handle immediate search on Enter key press
+  const handleSearchKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1);
+    }
+  }, [searchQuery]);
 
   // Reset to page 1 when tab changes
   const handleTabChange = (newTab: string) => {
@@ -385,6 +403,7 @@ function TicketsContent() {
             placeholder="Search tickets by title, description, tags..."
             value={searchQuery}
             onChange={(e) => handleFilterChange({ searchQuery: e.target.value })}
+            onKeyPress={handleSearchKeyPress}
             className="pl-10 bg-input-background"
           />
         </div>

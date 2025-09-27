@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Ticket, Users, Clock, CheckCircle, Tag } from 'lucide-react';
+import Link from 'next/link';
 
 import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -141,39 +142,41 @@ function DashboardContent() {
           <CardContent>
             <div className="space-y-4">
               {tickets?.tickets?.map((ticket) => (
-                <div key={ticket.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {ticket.title}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {ticket.team_name} • {new Date(ticket.created_at).toLocaleDateString()}
-                    </p>
-                    {ticket.tags && ticket.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {ticket.tags.slice(0, 2).map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                        {ticket.tags.length > 2 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{ticket.tags.length - 2}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="flex items-center gap-1">
-                      <div className={`w-2 h-2 rounded-full ${getPriorityColor(ticket.priority)}`}></div>
-                      <span className="text-xs capitalize">{ticket.priority}</span>
+                <Link key={ticket.id} href={`/tickets/${ticket.id}`}>
+                  <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {ticket.title}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {ticket.team_name} • {new Date(ticket.created_at).toLocaleDateString()}
+                      </p>
+                      {ticket.tags && ticket.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {ticket.tags.slice(0, 2).map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                          {ticket.tags.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{ticket.tags.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <Badge variant="secondary" className={getStatusColor(ticket.status)}>
-                      {ticket.status}
-                    </Badge>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center gap-1">
+                        <div className={`w-2 h-2 rounded-full ${getPriorityColor(ticket.priority)}`}></div>
+                        <span className="text-xs capitalize">{ticket.priority}</span>
+                      </div>
+                      <Badge variant="secondary" className={getStatusColor(ticket.status)}>
+                        {ticket.status}
+                      </Badge>
+                    </div>
                   </div>
-                </div>
+                </Link>
               ))}
               {(!tickets?.tickets || tickets.tickets.length === 0) && (
                 <p className="text-sm text-gray-500 text-center py-4">

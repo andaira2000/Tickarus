@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Filter, SortAsc, SortDesc, List, User, Eye, Tag, Clock, AlertCircle, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, SortAsc, SortDesc, List, User, Eye, Tag, Clock, AlertCircle, CheckCircle, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 
 import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -452,19 +452,18 @@ function TicketsContent() {
               className="shadow-md hover:shadow-lg transition-shadow cursor-pointer"
               onClick={() => window.open(`/tickets/${ticket.id}`, '_self')}
             >
-              <CardContent className="p-0">
-                {/* Title and ID row */}
-                <div className="flex items-start justify-between p-6 pb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 flex-1 pr-4">
-                    {ticket.title}
-                  </h3>
-                  <span className="text-sm text-gray-500 font-mono whitespace-nowrap">
-                    #{ticket.id}
-                  </span>
-                </div>
+              <CardContent className="p-4">
+                {/* Header - Title, Priority, Status, and ID */}
+                <div className="mb-6">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900 flex-1 pr-4">
+                      {ticket.title}
+                    </h3>
+                    <span className="text-sm text-gray-500 font-mono whitespace-nowrap">
+                      #{ticket.id}
+                    </span>
+                  </div>
 
-                {/* Main content */}
-                <div className="px-6 space-y-4">
                   {/* Priority and Status row */}
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
@@ -475,7 +474,10 @@ function TicketsContent() {
                       {formatStatus(ticket.status)}
                     </Badge>
                   </div>
+                </div>
 
+                {/* Main content */}
+                <div className="space-y-4">
                   {/* Description */}
                   <p className="text-gray-600 line-clamp-2 leading-relaxed">
                     {ticket.description}
@@ -500,14 +502,17 @@ function TicketsContent() {
                 </div>
 
                 {/* Meta information */}
-                <div className="flex items-center gap-4 text-sm text-gray-500 px-6 py-4 mt-4 border-t border-gray-100 bg-gray-50/50">
-                  <TicketCreator ticket={ticket} showAvatar={false} />
+                <div className="flex items-center gap-4 text-sm text-gray-500 pt-4 mt-4 border-t border-gray-100 bg-gray-50/50 -mx-4 px-4 pb-4">
+                  <div className="flex items-center gap-1">
+                    <User className="w-4 h-4" />
+                    <TicketCreator ticket={ticket} showAvatar={false} />
+                  </div>
                   <div className="flex items-center gap-1">
                     <Clock className="w-4 h-4" />
                     <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <User className="w-4 h-4" />
+                    <Users className="w-4 h-4" />
                     <span>{ticket.team_name}</span>
                   </div>
                 </div>
@@ -536,30 +541,90 @@ function TicketsContent() {
 
             {/* Page numbers */}
             <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
+              {(() => {
+                const pages = [];
+
+                if (totalPages <= 7) {
+                  // Show all pages if 7 or fewer
+                  for (let i = 1; i <= totalPages; i++) {
+                    pages.push(
+                      <Button
+                        key={i}
+                        variant={currentPage === i ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(i)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {i}
+                      </Button>
+                    );
+                  }
                 } else {
-                  pageNum = currentPage - 2 + i;
+                  // Always show first page
+                  pages.push(
+                    <Button
+                      key={1}
+                      variant={currentPage === 1 ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(1)}
+                      className="w-8 h-8 p-0"
+                    >
+                      1
+                    </Button>
+                  );
+
+                  // Show ellipsis if current page is far from start
+                  if (currentPage > 4) {
+                    pages.push(
+                      <span key="ellipsis1" className="px-2 text-gray-400">
+                        ...
+                      </span>
+                    );
+                  }
+
+                  // Show pages around current page
+                  const start = Math.max(2, currentPage - 1);
+                  const end = Math.min(totalPages - 1, currentPage + 1);
+
+                  for (let i = start; i <= end; i++) {
+                    pages.push(
+                      <Button
+                        key={i}
+                        variant={currentPage === i ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(i)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {i}
+                      </Button>
+                    );
+                  }
+
+                  // Show ellipsis if current page is far from end
+                  if (currentPage < totalPages - 3) {
+                    pages.push(
+                      <span key="ellipsis2" className="px-2 text-gray-400">
+                        ...
+                      </span>
+                    );
+                  }
+
+                  // Always show last page
+                  pages.push(
+                    <Button
+                      key={totalPages}
+                      variant={currentPage === totalPages ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(totalPages)}
+                      className="w-8 h-8 p-0"
+                    >
+                      {totalPages}
+                    </Button>
+                  );
                 }
 
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={currentPage === pageNum ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(pageNum)}
-                    className="w-8 h-8 p-0"
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
+                return pages;
+              })()}
             </div>
 
             <Button

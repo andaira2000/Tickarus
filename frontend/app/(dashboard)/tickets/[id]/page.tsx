@@ -341,17 +341,29 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
                   }
 
                   return (
-                    <div key={comment.id} className="border-l-2 border-gray-200 pl-4">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="font-medium text-gray-900">
-                          {comment.author_info ? comment.author_info.display_name : 'Unknown User'}
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          {new Date(comment.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-                        {comment.content}
+                    <div key={comment.id} className="bg-slate-50 border border-slate-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+                      <div className="flex items-start space-x-3">
+                        {/* Profile Avatar */}
+                        <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-sm font-medium">
+                            {(comment.author_info?.display_name || 'U').charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+
+                        {/* Comment Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <span className="font-medium text-slate-900">
+                              {comment.author_info ? comment.author_info.display_name : 'Unknown User'}
+                            </span>
+                            <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+                              {new Date(comment.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                            {comment.content}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
@@ -400,18 +412,18 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Status and Priority */}
+        <div className="space-y-6 sticky top-6 self-start max-h-[calc(100vh-8rem)] overflow-y-auto">
+          {/* Status, Priority, and Team */}
           <Card className="shadow-md">
-            <CardContent className="space-y-4 p-6">
-              <div className="grid grid-cols-2 gap-4">
+            <CardContent className="p-5">
+              <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Status</label>
+                  <label className="text-sm font-medium mb-2 block text-gray-700">Status</label>
                   <Select
                     value={ticket.status}
                     onValueChange={(value: TicketStatus) => handleStatusChange(value)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-9 w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -427,12 +439,12 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Priority</label>
+                  <label className="text-sm font-medium mb-2 block text-gray-700">Priority</label>
                   <Select
                     value={ticket.priority}
                     onValueChange={(value: TicketPriority) => handlePriorityChange(value)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-9 w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -443,25 +455,25 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
 
-              <div>
-                <label className="text-sm font-medium mb-2 block">Team</label>
-                <Select
-                  value={ticket.team_id}
-                  onValueChange={(value: string) => handleTeamChange(value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teams?.map((team) => (
-                      <SelectItem key={team.id} value={team.id}>
-                        {team.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div>
+                  <label className="text-sm font-medium mb-2 block text-gray-700">Team</label>
+                  <Select
+                    value={ticket.team_id}
+                    onValueChange={(value: string) => handleTeamChange(value)}
+                  >
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teams?.map((team) => (
+                        <SelectItem key={team.id} value={team.id}>
+                          {team.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>

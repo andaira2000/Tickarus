@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
-  Ticket,
+  List,
   Users,
   Search,
   Settings,
@@ -42,7 +42,7 @@ const navigation = [
   {
     name: 'Tickets',
     href: '/tickets',
-    icon: Ticket,
+    icon: List,
   },
   {
     name: 'Teams',
@@ -152,9 +152,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         href={item.href}
                         className={cn(
                           isPathActive(item.href)
-                            ? 'bg-gray-100 text-blue-600'
-                            : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50',
-                          'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold',
+                            ? 'bg-gray-100 text-gray-900'
+                            : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50',
+                          'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-colors duration-200',
                           !sidebarOpen && 'justify-center'
                         )}
                         title={!sidebarOpen ? item.name : undefined}
@@ -162,9 +162,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         <item.icon
                           className={cn(
                             isPathActive(item.href)
-                              ? 'text-blue-600'
-                              : 'text-gray-400 group-hover:text-blue-600',
-                            'h-6 w-6 shrink-0'
+                              ? 'text-gray-900'
+                              : 'text-gray-400 group-hover:text-gray-900',
+                            'h-6 w-6 shrink-0 transition-colors duration-200'
                           )}
                           aria-hidden="true"
                         />
@@ -181,12 +181,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="mt-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className={`w-full ${sidebarOpen ? 'justify-start' : 'justify-center'} p-2`}>
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>
-                      {user?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
+                <Button variant="ghost" className={`w-full ${sidebarOpen ? 'justify-start' : 'justify-center'} p-2 hover:bg-gray-50 transition-colors duration-200`}>
+                  <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center flex-shrink-0">
+                    <span className="text-white text-sm font-medium">
+                      {(user?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U').toUpperCase()}
+                    </span>
+                  </div>
                   {sidebarOpen && (
                     <div className="ml-3 text-left">
                       <p className="text-sm font-medium text-gray-900">

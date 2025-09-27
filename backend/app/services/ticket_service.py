@@ -56,12 +56,14 @@ class TicketService:
         try:
             from app.services.ai_automation_service import AIAutomationService
             import asyncio
+
             asyncio.create_task(
                 AIAutomationService.handle_ticket_created(ticket.id, actor_id)
             )
         except Exception as e:
             # Don't fail ticket creation if AI automation fails
             import logging
+
             logger = logging.getLogger(__name__)
             logger.warning(f"AI automation failed for ticket {ticket.id}: {str(e)}")
 
@@ -186,24 +188,32 @@ class TicketService:
             # Need to find tickets where this user (via their actor) has commented
             # First get the user's actor ID
             from ..services.actor_service import ActorService
+
             user_actor = await ActorService.get_actor_for_user(commented_by)
             if not user_actor:
                 return {"tickets": [], "total": 0, "page": page, "page_size": page_size}
-            
+
             cm_resp = exec_query(
-                c.table("comments").select("ticket_id").eq("actor_id", str(user_actor.id))
+                c.table("comments")
+                .select("ticket_id")
+                .eq("actor_id", str(user_actor.id))
             )
             tids = list({row["ticket_id"] for row in (cm_resp.data or [])})
             if not tids:
                 return {"tickets": [], "total": 0, "page": page, "page_size": page_size}
             q = q.in_("id", tids)
 
+        # Apply search before pagination
+        if search_query:
+            # Use case-insensitive search on title and description
+            q = q.or_(f"title.ilike.%{search_query}%,description.ilike.%{search_query}%")
+
+        # Apply ordering and pagination
+        q = q.order("last_activity_at", desc=True)
+
         from_ = (page - 1) * page_size
         to_ = from_ + (page_size - 1)
-        q = q.order("last_activity_at", desc=True).range(from_, to_)
-
-        if search_query:
-            q = q.text_search("search_tsv", search_query, options={"type": "websearch"})
+        q = q.range(from_, to_)
 
         resp = exec_query(q)
         data = resp.data or []
@@ -301,17 +311,23 @@ class TicketService:
         if row.get("actor_id"):
             actor_resp = exec_single(
                 c.table("actors")
-                .select("*, profiles(full_name, username, avatar_url), system_users(name, type)")
+                .select(
+                    "*, profiles(full_name, username, avatar_url), system_users(name, type)"
+                )
                 .eq("id", row["actor_id"])
             )
             actor_data = actor_resp.data
             if actor_data["actor_type"] == "human" and actor_data.get("profiles"):
                 from ..models.actor import ActorInfo
+
                 creator_info = ActorInfo.from_human_profile(
                     UUID(actor_data["id"]), actor_data["profiles"]
                 ).dict()
-            elif actor_data["actor_type"] == "system" and actor_data.get("system_users"):
+            elif actor_data["actor_type"] == "system" and actor_data.get(
+                "system_users"
+            ):
                 from ..models.actor import ActorInfo
+
                 creator_info = ActorInfo.from_system_user(
                     UUID(actor_data["id"]), actor_data["system_users"]
                 ).dict()

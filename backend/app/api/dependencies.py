@@ -1,27 +1,51 @@
+from uuid import UUID
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from uuid import UUID
-from app.db.database import init_supabase, bind_request_client
+from supabase import AsyncClient
+from supabase_auth import User
+
+from app.db.database import get_service_client, get_client_for_token
 
 security = HTTPBearer()
 
 
-async def get_current_user(
+async def get_supabase_service_client() -> AsyncClient:
+    """Get the Supabase service client."""
+    return await get_service_client()
+
+
+async def get_supabase_request_client(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-):
-    """
-    Validate JWT with Supabase and bind a request-scoped client carrying the caller's token,
-    so RLS policies apply automatically to all service calls in this request.
-    """
+) -> AsyncClient:
+    """Get Supabase client bound to the current request's user token."""
     if not credentials or not credentials.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token"
         )
 
     token = credentials.credentials
-    base = init_supabase()
     try:
-        user = base.auth.get_user(token)
+        return await get_client_for_token(token)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        )
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    service_client: AsyncClient = Depends(get_supabase_service_client),
+) -> User:
+    """Get the current user from the request."""
+    if not credentials or not credentials.credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing token"
+        )
+
+    token = credentials.credentials
+    try:
+        user = await service_client.auth.get_user(token)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
@@ -32,29 +56,8 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user"
         )
 
-    bind_request_client(token)
     return user.user
 
 
-async def get_current_user_id(user=Depends(get_current_user)) -> UUID:
+async def get_current_user_id(user: User = Depends(get_current_user)) -> UUID:
     return UUID(user.id)
-
-
-async def get_optional_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-):
-    """
-    Optional auth; returns None if missing/invalid.
-    """
-    if not credentials:
-        return None
-    try:
-        token = credentials.credentials
-        base = init_supabase()
-        user = base.auth.get_user(token)
-        if user and user.user:
-            bind_request_client(token)
-            return user.user
-        return None
-    except Exception:
-        return None

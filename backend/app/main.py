@@ -2,62 +2,39 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
-import os
-import sys
 
 from app.config import settings
-from app.db.database import init_supabase
+from app.logging import configure_logging
 from app.api.routes import (
+    # ai_chat,
     auth,
-    tickets,
-    comments,
-    tags,
-    teams,
-    github,
-    metrics,
-    ai_chat,
+    # comments,
+    # evaluation,
+    # github,
+    # metrics,
+    # tags,
+    # teams,
+    # tickets,
 )
-from app.api import evaluation
+from app.db.database import init_supabase_service_client
 from app.services.llm_interface import (
     initialize_llm_service,
+    LLMProvider,
     OpenAIProvider,
     AnthropicProvider,
     MockLLMProvider,
 )
 
 
-def _configure_logging():
-    """Configure logging for local development (not needed in Lambda)"""
-    level = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO)
-    root = logging.getLogger()
-    root.setLevel(level)
-    if root.handlers:
-        for h in root.handlers:
-            h.setLevel(level)
-            h.setFormatter(
-                logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s")
-            )
-    else:
-        sh = logging.StreamHandler(sys.stdout)
-        sh.setLevel(level)
-        sh.setFormatter(
-            logging.Formatter("%(asctime)s %(levelname)s %(name)s - %(message)s")
-        )
-        root.addHandler(sh)
-
-
-# Configure logging for local development
-_configure_logging()
-
+configure_logging()
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize base Supabase client once
-    init_supabase()
+    await init_supabase_service_client()
 
-    # Initialize LLM service based on configuration
+    provider: LLMProvider
     try:
         if settings.llm_provider == "openai" and settings.openai_api_key:
             provider = OpenAIProvider(
@@ -75,7 +52,7 @@ async def lifespan(app: FastAPI):
             )
         else:
             provider = MockLLMProvider()
-            logger.info("Initialized Mock LLM provider (no API costs)")
+            logger.info("Initialized Mock LLM provider")
 
         initialize_llm_service(provider)
     except Exception as e:
@@ -95,7 +72,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS (adjust for your frontend origins)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -110,13 +86,12 @@ async def health_check():
     return {"status": "healthy", "service": "backend"}
 
 
-# Routers
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
-app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
-app.include_router(tickets.router, prefix="/api/tickets", tags=["tickets"])
-app.include_router(comments.router, prefix="/api/comments", tags=["comments"])
-app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
-app.include_router(github.router, prefix="/api", tags=["github"])
-app.include_router(metrics.router, prefix="/api/metrics", tags=["metrics"])
-app.include_router(ai_chat.router, prefix="/api/ai-chat", tags=["ai-chat"])
-app.include_router(evaluation.router, prefix="/api", tags=["evaluation"])
+# app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
+# app.include_router(tickets.router, prefix="/api/tickets", tags=["tickets"])
+# app.include_router(comments.router, prefix="/api/comments", tags=["comments"])
+# app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
+# app.include_router(github.router, prefix="/api", tags=["github"])
+# app.include_router(metrics.router, prefix="/api/metrics", tags=["metrics"])
+# app.include_router(ai_chat.router, prefix="/api/ai-chat", tags=["ai-chat"])
+# app.include_router(evaluation.router, prefix="/api", tags=["evaluation"])

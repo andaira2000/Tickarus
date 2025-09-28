@@ -1,8 +1,12 @@
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr
-from typing import Optional
-from app.db.database import init_supabase
-from app.api.dependencies import get_current_user
+from supabase import AsyncClient
+from supabase_auth import User
+
+from app.api.dependencies import get_current_user, get_supabase_service_client
+from app.services.actor_service import ActorService
 
 router = APIRouter()
 
@@ -19,13 +23,13 @@ class UserLogin(BaseModel):
 
 
 @router.post("/register")
-def register(user: UserRegister):
-    """
-    Email/password sign-up. Supabase may require email confirmation depending on your project settings.
-    """
-    supabase = init_supabase()
+async def register(
+    user: UserRegister,
+    supabase_service_client: AsyncClient = Depends(get_supabase_service_client),
+):
+    """Email/password registration. Returns user ID and email."""
     try:
-        resp = supabase.auth.sign_up(
+        result = await supabase_service_client.auth.sign_up(
             {
                 "email": user.email,
                 "password": user.password,
@@ -34,23 +38,24 @@ def register(user: UserRegister):
                 },
             }
         )
-        if not resp or not resp.user:
+        if not result.user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Sign-up failed"
             )
-        return {"user_id": resp.user.id, "email": resp.user.email}
+
+        return {"user_id": result.user.id, "email": result.user.email}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.post("/login")
-def login(creds: UserLogin):
-    """
-    Email/password login. Returns access and refresh tokens.
-    """
-    supabase = init_supabase()
+async def login(
+    creds: UserLogin,
+    supabase_service_client: AsyncClient = Depends(get_supabase_service_client),
+):
+    """Email/password login. Returns access and refresh tokens."""
     try:
-        session = supabase.auth.sign_in_with_password(
+        session = await supabase_service_client.auth.sign_in_with_password(
             {"email": creds.email, "password": creds.password}
         )
         if not session or not session.session:
@@ -68,15 +73,17 @@ def login(creds: UserLogin):
 
 
 @router.get("/me")
-async def get_current_user_profile(current_user=Depends(get_current_user)):
-    """
-    Get current user's profile information from JWT token.
-    """
+async def get_current_user_profile(current_user: User = Depends(get_current_user)):
+    """Get current user's profile information."""
     try:
         return {
             "id": current_user.id,
             "email": current_user.email,
-            "full_name": current_user.user_metadata.get("full_name") if current_user.user_metadata else None,
+            "full_name": (
+                current_user.user_metadata.get("full_name")
+                if current_user.user_metadata
+                else None
+            ),
             "email_confirmed_at": current_user.email_confirmed_at,
             "created_at": current_user.created_at,
             "updated_at": current_user.updated_at,
@@ -84,5 +91,5 @@ async def get_current_user_profile(current_user=Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get user profile: {str(e)}"
+            detail=f"Failed to get user profile: {str(e)}",
         )

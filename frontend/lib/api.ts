@@ -20,7 +20,7 @@ import {
   ChatResponse
 } from './types';
 
-const API_BASE_URL = process.env.NEXT_USE_CLOUD_API === 'false' ? 'http://localhost:8000' : process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_USE_CLOUD_API === 'false' ? process.env.NEXT_PUBLIC_LOCALHOST_URL : process.env.NEXT_PUBLIC_API_URL;
 
 class ApiClient {
   private client = axios.create({

@@ -18,7 +18,7 @@ async def init_supabase_service_client():
         logger.info("Initialized Supabase service client")
 
 
-async def get_service_client() -> AsyncClient:
+def get_service_client() -> AsyncClient:
     if not service_client:
         raise Exception("Supabase service client not initialized")
     return service_client

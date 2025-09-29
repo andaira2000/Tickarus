@@ -1,9 +1,8 @@
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from uuid import UUID
 
 import asyncio
-from fastapi import HTTPException, status as http_status
 from supabase import AsyncClient
 
 from app.models.actor import ActorInfo
@@ -17,8 +16,6 @@ from app.models.ticket import (
 )
 
 from app.services.actor_service import ActorService
-
-# from app.services.ai_automation_service import AIAutomationService
 from app.services.tag_service import TagService
 
 
@@ -52,18 +49,6 @@ class TicketService:
         )
 
         ticket = await TicketService._hydrate_ticket(ticket, supabase_client)
-
-        # def ai_automation_callback(task: asyncio.Task):
-        #     if task.exception():
-        #         logger.error(
-        #             f"AI automation failed for ticket {ticket.id}: {str(task.exception())}"
-        #         )
-        #     else:
-        #         logger.info(f"AI automation completed for ticket {ticket.id}")
-
-        # asyncio.create_task(
-        #     AIAutomationService.handle_ticket_created(ticket.id, actor_id)
-        # ).add_done_callback(ai_automation_callback)
 
         return ticket
 

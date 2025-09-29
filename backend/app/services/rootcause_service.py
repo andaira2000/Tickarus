@@ -1,9 +1,8 @@
 import time
-import asyncio
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 import logging
-from app.db.database import get_supabase, get_service_client, exec_query
+from app.db.database import get_service_client
 from app.services.metrics_service import MetricsService
 from app.services.llm_interface import get_llm_service, LLMMessage
 from app.services.similarity_service import SimilarityService
@@ -246,15 +245,7 @@ class RootCauseService:
         client=None,
     ) -> Dict[str, Any]:
         """
-        Perform root cause analysis on a ticket using LLM or fallback patterns
-
-        Args:
-            ticket_id: ID of ticket to analyze
-            user_id: User requesting analysis (for metrics)
-            use_llm: Whether to use LLM analysis (True) or fallback patterns (False)
-
-        Returns:
-            Analysis results with root cause and suggestions
+        Perform root cause analysis on a ticket using AI
         """
         start_time = time.time()
 

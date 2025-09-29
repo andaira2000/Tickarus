@@ -10,9 +10,9 @@ from app.db.database import get_service_client, get_client_for_token
 security = HTTPBearer()
 
 
-async def get_supabase_service_client() -> AsyncClient:
+def get_supabase_service_client() -> AsyncClient:
     """Get the Supabase service client."""
-    return await get_service_client()
+    return get_service_client()
 
 
 async def get_supabase_request_client(

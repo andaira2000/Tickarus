@@ -51,7 +51,7 @@ async def get_repository_context(
     supabase_client: AsyncClient = Depends(get_supabase_service_client),
 ):
     """Get comprehensive repository context for AI analysis."""
-    context = await github_service.get_repository_context(full_name, supabase_client)
+    context = await github_service.get_repository_context(full_name)
     if not context:
         raise HTTPException(status_code=404, detail="Repository context not available")
     return context

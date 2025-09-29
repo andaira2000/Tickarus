@@ -1,7 +1,4 @@
 import asyncio
-import hashlib
-import hmac
-import json
 import logging
 import re
 from collections import defaultdict
@@ -26,6 +23,7 @@ from app.models.github_repository import (
 )
 from app.models.ticket import TicketCreate, TicketStatus, TicketPriority
 from app.services.actor_service import ActorService
+from app.services.ai_automation_service import AIAutomationService
 from app.services.ticket_service import TicketService
 
 logger = logging.getLogger(__name__)
@@ -96,9 +94,7 @@ class GitHubService:
         ).data
         return GitHubRepository(**repo[0]) if repo else None
 
-    async def get_repository_context(
-        self, full_name: str, supabase_client: AsyncClient
-    ) -> Dict:
+    async def get_repository_context(self, full_name: str) -> Dict:
         """Gather comprehensive repository context for AI analysis."""
         try:
             repo = self.github_client.get_repo(full_name)
@@ -182,9 +178,7 @@ class GitHubService:
             logger.error(f"GitHub API error for {full_name}: {e}")
             return {}
         except Exception as e:
-            logger.error(
-                f"Unexpected error getting context for {full_name}: {e.with_traceback()}"
-            )
+            logger.error(f"Unexpected error getting context for {full_name}: {e}")
             return {}
 
     async def _get_key_files_structure(self, repo) -> List[Dict]:
@@ -254,7 +248,7 @@ class GitHubService:
 
         # Create automated ticket
 
-        repo_context = await self.get_repository_context(full_name, supabase_client)
+        repo_context = await self.get_repository_context(full_name)
         ticket_description = self._format_ci_failure_description(
             ci_failure_data, repo_context, payload
         )
@@ -283,7 +277,7 @@ class GitHubService:
             {"ticket_id": str(ticket.id)}
         ).eq("id", ci_failure_id).execute()
 
-        # Auto-tag the ticket
+        # Autotag the ticket
         await TicketService.add_tags(
             ticket.id,
             [
@@ -297,6 +291,19 @@ class GitHubService:
         )
 
         logger.info(f"Created ticket {ticket.id} for CI failure in {full_name}")
+
+        def ai_automation_callback(task: asyncio.Task):
+            if task.exception():
+                logger.error(
+                    f"AI automation failed for ticket {ticket.id}: {str(task.exception())}"
+                )
+            else:
+                logger.info(f"AI automation completed for ticket {ticket.id}")
+
+        asyncio.create_task(
+            AIAutomationService.handle_ci_ticket_created(ticket.id)
+        ).add_done_callback(ai_automation_callback)
+
         return ticket.id
 
     def _format_ci_failure_description(

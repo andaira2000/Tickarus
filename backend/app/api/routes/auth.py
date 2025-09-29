@@ -6,7 +6,6 @@ from supabase import AsyncClient
 from supabase_auth import User
 
 from app.api.dependencies import get_current_user, get_supabase_service_client
-from app.services.actor_service import ActorService
 
 router = APIRouter()
 
@@ -42,6 +41,8 @@ async def register(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Sign-up failed"
             )
+
+        # Profile and actor creation are handled by Supabase trigger functions.
 
         return {"user_id": result.user.id, "email": result.user.email}
     except Exception as e:

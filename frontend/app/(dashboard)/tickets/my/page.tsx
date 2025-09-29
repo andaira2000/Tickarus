@@ -159,7 +159,7 @@ function MyTicketsContent() {
                 </TableCell>
                 <TableCell>
                   <span className="text-sm text-gray-500">
-                    {ticket.comments_count || 0}
+                    {ticket.comment_count || 0}
                   </span>
                 </TableCell>
                 <TableCell>

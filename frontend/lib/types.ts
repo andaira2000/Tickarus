@@ -69,7 +69,7 @@ export interface Ticket {
   updated_at?: string;
   last_activity_at?: string;
   tags?: string[];
-  comments_count?: number;
+  comment_count?: number;
   team_name?: string;
   // populated by hydration - creator info from actor
   creator_info?: ActorInfo;

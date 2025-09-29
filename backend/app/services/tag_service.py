@@ -1,55 +1,73 @@
+import logging
 from typing import List
 from uuid import UUID
-from fastapi import HTTPException, status as http_status
-from app.db.database import get_supabase, exec_query, exec_single, first_row
+
+from supabase import AsyncClient
+
+from app.db.database import service_client
 from app.models.tag import Tag, TagCreate
+
+logger = logging.getLogger(__name__)
 
 
 class TagService:
     @staticmethod
-    def _c():
-        return get_supabase()
-
-    @classmethod
-    async def create_tag(cls, tag_data: TagCreate, actor_id: UUID) -> Tag:
-        c = cls._c()
+    async def create_tag(
+        tag_data: TagCreate, actor_id: UUID, supabase_client: AsyncClient
+    ) -> Tag:
+        """Creates a new tag if it doesn't exist, otherwise returns the existing tag."""
         name = tag_data.name.lower()
         try:
-            existing = exec_single(c.table("tags").select("*").eq("name", name))
-            return Tag(**existing.data)
+            existing_tag = (
+                await supabase_client.table("tags")
+                .select("*")
+                .eq("name", name)
+                .single()
+                .execute()
+            ).data
+            return Tag(**existing_tag)
         except Exception:
-            created = exec_query(
-                c.table("tags").insert(
-                    {"name": name, "creator_actor_id": str(actor_id)},
+            tag = (
+                await supabase_client.table("tags")
+                .insert(
+                    {
+                        "name": name,
+                        "is_standard": supabase_client == service_client,
+                        "creator_actor_id": str(actor_id),
+                    },
                     returning="representation",
                 )
-            )
-            row = first_row(created.data)
-            if not row:
-                raise HTTPException(
-                    http_status.HTTP_400_BAD_REQUEST, "Create tag failed"
-                )
-            return Tag(**row)
+                .execute()
+            ).data[0]
 
-    @classmethod
-    async def list_tags(cls) -> List[Tag]:
-        c = cls._c()
-        resp = exec_query(
-            c.table("tags")
+            return Tag(**tag)
+
+    @staticmethod
+    async def get_all_tags(supabase_client: AsyncClient) -> List[Tag]:
+        """Get all tags, standard tags first, then custom tags alphabetically."""
+        tags = (
+            await supabase_client.table("tags")
             .select("*")
             .order("is_standard", desc=True)
             .order("name", desc=False)
-        )
-        return [Tag(**r) for r in (resp.data or [])]
+            .execute()
+        ).data
 
-    @classmethod
-    async def get_popular_tags(cls, limit: int = 10):
-        c = cls._c()
-        join = exec_query(c.table("ticket_tags").select("tag_id, tags(name)"))
+        return [Tag(**tag) for tag in tags]
+
+    @staticmethod
+    async def get_popular_tags(limit: int, supabase_client: AsyncClient):
+        """Get the most popular tags based on their usage in tickets."""
+        tags_in_tickets = (
+            await supabase_client.table("ticket_tags")
+            .select("tag_id, tags(name)")
+            .execute()
+        ).data
+
         counts: dict[str, int] = {}
-        for row in join.data or []:
-            nm = row.get("tags", {}).get("name")
-            if nm:
-                counts[nm] = counts.get(nm, 0) + 1
+        for tag in tags_in_tickets:
+            name = tag.get("tags", {}).get("name")
+            if name:
+                counts[name] = counts.get(name, 0) + 1
         sorted_tags = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)[:limit]
         return [{"name": name, "count": count} for name, count in sorted_tags]

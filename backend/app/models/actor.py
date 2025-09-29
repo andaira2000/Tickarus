@@ -20,11 +20,9 @@ class ActorBase(BaseModel):
 
 
 class Actor(ActorBase, BaseDBModel):
+    # Hydrated fields
     updated_at: Optional[datetime] = None
-
-    # Will contain profile data when expanded
     profile: Optional[Dict[str, Any]] = None
-    # Will contain system user data when expanded
     system_user: Optional[Dict[str, Any]] = None
 
 
@@ -38,9 +36,9 @@ class ActorInfo(BaseModel):
     is_system: bool
     system_user_type: Optional[str] = None
 
-    @classmethod
-    def from_human_profile(cls, actor_id: UUID, profile: Dict[str, Any]):
-        return cls(
+    @staticmethod
+    def from_human_profile(actor_id: UUID, profile: Dict[str, Any]):
+        return ActorInfo(
             id=actor_id,
             actor_type=ActorType.HUMAN,
             display_name=profile.get("full_name")
@@ -50,13 +48,13 @@ class ActorInfo(BaseModel):
             is_system=False,
         )
 
-    @classmethod
-    def from_system_user(cls, actor_id: UUID, system_user: Dict[str, Any]):
-        return cls(
+    @staticmethod
+    def from_system_user(actor_id: UUID, system_user: Dict[str, Any]):
+        return ActorInfo(
             id=actor_id,
             actor_type=ActorType.SYSTEM,
             display_name=system_user.get("name", "Unknown System User"),
-            avatar_url=None,  # System users don't have avatars
+            avatar_url=None,
             is_system=True,
             system_user_type=system_user.get("type"),
         )

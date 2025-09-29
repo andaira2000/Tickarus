@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 from pydantic import BaseModel
 from uuid import UUID
 
@@ -8,7 +8,7 @@ class GitHubRepository(BaseModel):
     id: Optional[UUID] = None
     org_name: str
     repo_name: str
-    full_name: str  # "org/repo"
+    full_name: str
     description: Optional[str] = None
     primary_language: Optional[str] = None
     webhook_secret: Optional[str] = None
@@ -52,7 +52,7 @@ class CIFailure(BaseModel):
 
 
 class CIFailureCreate(BaseModel):
-    repo_id: UUID
+    repo_id: str
     workflow_name: str
     commit_sha: str
     branch_name: str
@@ -63,7 +63,7 @@ class CIFailureCreate(BaseModel):
 class RepositoryContext(BaseModel):
     id: Optional[UUID] = None
     repo_id: UUID
-    context_type: str  # "recent_commits", "file_structure", "contributors", etc.
+    context_type: str
     context_data: dict
     last_updated: Optional[datetime] = None
     created_at: Optional[datetime] = None
@@ -74,6 +74,7 @@ class RepositoryContext(BaseModel):
 
 class GitHubWebhookPayload(BaseModel):
     """Model for GitHub webhook payload"""
+
     action: Optional[str] = None  # Not present in ping events
     repository: dict
     workflow_run: Optional[dict] = None

@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 import logging
 import time
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,9 @@ class LLMMessage:
 class LLMResponse:
     """Standard response format from LLM"""
 
-    def __init__(self, content: str, usage: Optional[Dict[str, int]] = None, model: str = None):
+    def __init__(
+        self, content: str, usage: Optional[Dict[str, int]] = None, model: str = None
+    ):
         self.content = content
         self.usage = usage or {}
         self.model = model
@@ -42,7 +43,7 @@ class LLMProvider(ABC):
         messages: List[LLMMessage],
         max_tokens: int = 1000,
         temperature: float = 0.7,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """Generate chat completion"""
         pass
@@ -66,9 +67,12 @@ class OpenAIProvider(LLMProvider):
         if self._client is None:
             try:
                 import openai
+
                 self._client = openai.AsyncOpenAI(api_key=self.api_key)
             except ImportError:
-                raise ImportError("openai package not installed. Run: pip install openai")
+                raise ImportError(
+                    "openai package not installed. Run: pip install openai"
+                )
         return self._client
 
     async def chat_completion(
@@ -76,7 +80,7 @@ class OpenAIProvider(LLMProvider):
         messages: List[LLMMessage],
         max_tokens: int = 1000,
         temperature: float = 0.7,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """Generate chat completion using OpenAI"""
 
@@ -91,21 +95,17 @@ class OpenAIProvider(LLMProvider):
                 messages=openai_messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
-                **kwargs
+                **kwargs,
             )
 
             content = response.choices[0].message.content
             usage = {
                 "prompt_tokens": response.usage.prompt_tokens,
                 "completion_tokens": response.usage.completion_tokens,
-                "total_tokens": response.usage.total_tokens
+                "total_tokens": response.usage.total_tokens,
             }
 
-            return LLMResponse(
-                content=content,
-                usage=usage,
-                model=self.model
-            )
+            return LLMResponse(content=content, usage=usage, model=self.model)
 
         except Exception as e:
             logger.error(f"OpenAI API error: {str(e)}")
@@ -128,9 +128,12 @@ class AnthropicProvider(LLMProvider):
         if self._client is None:
             try:
                 import anthropic
+
                 self._client = anthropic.AsyncAnthropic(api_key=self.api_key)
             except ImportError:
-                raise ImportError("anthropic package not installed. Run: pip install anthropic")
+                raise ImportError(
+                    "anthropic package not installed. Run: pip install anthropic"
+                )
         return self._client
 
     async def chat_completion(
@@ -138,7 +141,7 @@ class AnthropicProvider(LLMProvider):
         messages: List[LLMMessage],
         max_tokens: int = 1000,
         temperature: float = 0.7,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """Generate chat completion using Anthropic Claude"""
 
@@ -161,21 +164,18 @@ class AnthropicProvider(LLMProvider):
                 temperature=temperature,
                 system=system_message,
                 messages=conversation_messages,
-                **kwargs
+                **kwargs,
             )
 
             content = response.content[0].text
             usage = {
                 "prompt_tokens": response.usage.input_tokens,
                 "completion_tokens": response.usage.output_tokens,
-                "total_tokens": response.usage.input_tokens + response.usage.output_tokens
+                "total_tokens": response.usage.input_tokens
+                + response.usage.output_tokens,
             }
 
-            return LLMResponse(
-                content=content,
-                usage=usage,
-                model=self.model
-            )
+            return LLMResponse(content=content, usage=usage, model=self.model)
 
         except Exception as e:
             logger.error(f"Anthropic API error: {str(e)}")
@@ -193,7 +193,7 @@ class MockLLMProvider(LLMProvider):
             "Based on the error description, this appears to be a database connection timeout issue. I recommend checking: 1) Database server status 2) Connection pool configuration 3) Network connectivity between services.",
             "This looks like a memory-related issue. The symptoms suggest a potential memory leak. Consider: 1) Analyzing heap dumps 2) Reviewing recent code changes 3) Monitoring memory usage patterns.",
             "The performance degradation suggests a bottleneck in the system. To diagnose: 1) Check database query performance 2) Review system resource utilization 3) Analyze request patterns.",
-            "This appears to be an authentication/authorization issue. Steps to resolve: 1) Verify user permissions 2) Check authentication service logs 3) Review access control configuration."
+            "This appears to be an authentication/authorization issue. Steps to resolve: 1) Verify user permissions 2) Check authentication service logs 3) Review access control configuration.",
         ]
         self.response_index = 0
 
@@ -202,12 +202,13 @@ class MockLLMProvider(LLMProvider):
         messages: List[LLMMessage],
         max_tokens: int = 1000,
         temperature: float = 0.7,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """Generate mock response"""
 
         # Simulate API delay
         import asyncio
+
         await asyncio.sleep(0.5)
 
         # Get next mock response
@@ -218,14 +219,11 @@ class MockLLMProvider(LLMProvider):
         usage = {
             "prompt_tokens": sum(len(msg.content.split()) for msg in messages),
             "completion_tokens": len(content.split()),
-            "total_tokens": sum(len(msg.content.split()) for msg in messages) + len(content.split())
+            "total_tokens": sum(len(msg.content.split()) for msg in messages)
+            + len(content.split()),
         }
 
-        return LLMResponse(
-            content=content,
-            usage=usage,
-            model="mock-llm"
-        )
+        return LLMResponse(content=content, usage=usage, model="mock-llm")
 
     def get_provider_name(self) -> str:
         return "mock-llm"
@@ -239,20 +237,15 @@ class LLMService:
         self.usage_stats = {
             "total_requests": 0,
             "total_tokens": 0,
-            "total_cost_estimate": 0.0
+            "total_cost_estimate": 0.0,
         }
-
-    def switch_provider(self, new_provider: LLMProvider):
-        """Switch to a different LLM provider"""
-        logger.info(f"Switching LLM provider from {self.provider.get_provider_name()} to {new_provider.get_provider_name()}")
-        self.provider = new_provider
 
     async def generate_response(
         self,
         messages: List[LLMMessage],
         max_tokens: int = 1000,
         temperature: float = 0.7,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """Generate response using current provider"""
 
@@ -263,7 +256,7 @@ class LLMService:
                 messages=messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
-                **kwargs
+                **kwargs,
             )
 
             # Update usage stats
@@ -272,10 +265,14 @@ class LLMService:
 
             # Rough cost estimate (OpenAI GPT-3.5-turbo pricing)
             cost_per_token = 0.000002  # $0.002 per 1K tokens
-            self.usage_stats["total_cost_estimate"] += response.usage.get("total_tokens", 0) * cost_per_token
+            self.usage_stats["total_cost_estimate"] += (
+                response.usage.get("total_tokens", 0) * cost_per_token
+            )
 
             response_time = time.time() - start_time
-            logger.info(f"LLM response generated in {response_time:.2f}s using {self.provider.get_provider_name()}")
+            logger.info(
+                f"LLM response generated in {response_time:.2f}s using {self.provider.get_provider_name()}"
+            )
 
             return response
 
@@ -285,24 +282,21 @@ class LLMService:
 
     def get_usage_stats(self) -> Dict[str, Any]:
         """Get usage statistics"""
-        return {
-            **self.usage_stats,
-            "provider": self.provider.get_provider_name()
-        }
+        return {**self.usage_stats, "provider": self.provider.get_provider_name()}
 
 
-# Global LLM service instance - will be configured in main app
 llm_service: Optional[LLMService] = None
 
 
 def initialize_llm_service(provider: LLMProvider):
-    """Initialize the global LLM service"""
+    """Initialize the global LLM service."""
     global llm_service
-    llm_service = LLMService(provider)
+    if not llm_service:
+        llm_service = LLMService(provider)
 
 
 def get_llm_service() -> LLMService:
-    """Get the global LLM service instance"""
+    """Get the global LLM service instance."""
     if llm_service is None:
-        raise RuntimeError("LLM service not initialized. Call initialize_llm_service() first.")
+        raise RuntimeError("LLM service not initialized.")
     return llm_service

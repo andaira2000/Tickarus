@@ -3,17 +3,20 @@ import hashlib
 import hmac
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+import re
+from collections import defaultdict
+from datetime import datetime, timezone
+from itertools import islice
+from typing import Dict, List, Optional
 from uuid import UUID
 
 import httpx
 from github import Github
 from github.GithubException import GithubException
+from supabase import AsyncClient
 
-from ..config import settings
-from ..db.database import get_supabase
-from ..models.github_repository import (
+from app.config import settings
+from app.models.github_repository import (
     GitHubRepository,
     GitHubRepositoryCreate,
     CIFailure,
@@ -21,92 +24,46 @@ from ..models.github_repository import (
     RepositoryContext,
     GitHubWebhookPayload,
 )
-from ..models.ticket import TicketCreate, TicketStatus, TicketPriority
-import re
-from collections import defaultdict
-
+from app.models.ticket import TicketCreate, TicketStatus, TicketPriority
+from app.services.actor_service import ActorService
+from app.services.ticket_service import TicketService
 
 logger = logging.getLogger(__name__)
+
+CI_BOT_UUID = "00000000-0000-4000-8000-000000000001"
+CI_BOT_ACTOR = None
+
+
+async def _get_ci_bot_actor(supabase_client: AsyncClient):
+    global CI_BOT_ACTOR
+    if not CI_BOT_ACTOR:
+        CI_BOT_ACTOR = await ActorService.get_actor_for_system_user(
+            UUID(CI_BOT_UUID), supabase_client
+        )
+
+    return CI_BOT_ACTOR
 
 
 class GitHubService:
     def __init__(self):
-        self.github_token = getattr(settings, "github_token", None)
-        self.github_client = (
-            Github(self.github_token)
-            if self.github_token and self.github_token != "your_github_token_here"
-            else None
-        )
-        self.org_name = getattr(settings, "github_org_name", "tickarus-demo-org")
-        self.webhook_secret = getattr(settings, "github_webhook_secret", None)
-        self._ticket_service = None
-
-    @property
-    def ticket_service(self):
-        """Lazy import to avoid circular dependencies"""
-        if self._ticket_service is None:
-            from .ticket_service import TicketService
-
-            self._ticket_service = TicketService()
-        return self._ticket_service
-
-    async def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
-        """Verify GitHub webhook signature"""
-        # Skip verification in dev mode if no webhook secret is set
-        return True
-        if not self.webhook_secret:
-            logger.warning(
-                "No webhook secret configured, skipping signature verification"
-            )
-            return True  # Skip verification in dev mode
-
-        if not signature:
-            logger.warning(
-                "No signature provided in webhook request - allowing in dev mode"
-            )
-            return True  # Allow in dev mode when signature is missing
-
-        try:
-            # GitHub sends signature as "sha256=<hex_digest>"
-            expected_signature = hmac.new(
-                self.webhook_secret.encode("utf-8"), payload, hashlib.sha256
-            ).hexdigest()
-
-            expected_sig_string = f"sha256={expected_signature}"
-
-            logger.info(f"Expected signature: {expected_sig_string}")
-            logger.info(f"Received signature: {signature}")
-
-            # Compare the signatures
-            is_valid = hmac.compare_digest(expected_sig_string, signature)
-
-            if not is_valid:
-                logger.error("Webhook signature verification failed")
-            else:
-                logger.info("Webhook signature verified successfully")
-
-            return is_valid
-
-        except Exception as e:
-            logger.error(f"Error verifying webhook signature: {e}")
-            return False
+        self.github_token = settings.github_token
+        self.github_client = Github(self.github_token)
+        self.org_name = settings.github_org_name
+        self.webhook_secret = settings.github_webhook_secret
 
     async def create_repository(
-        self, repo_data: GitHubRepositoryCreate
+        self, repo_data: GitHubRepositoryCreate, supabase_client: AsyncClient
     ) -> GitHubRepository:
         """Create a new GitHub repository record"""
-        supabase = get_supabase()
-
         full_name = f"{repo_data.org_name}/{repo_data.repo_name}"
 
-        # Check if repository already exists
-        existing = (
-            supabase.table("github_repositories")
+        existing_repo = (
+            await supabase_client.table("github_repositories")
             .select("*")
             .eq("full_name", full_name)
             .execute()
-        )
-        if existing.data:
+        ).data
+        if existing_repo:
             raise ValueError(f"Repository {full_name} already exists")
 
         repo_record = {
@@ -116,42 +73,39 @@ class GitHubService:
             "description": repo_data.description,
             "primary_language": repo_data.primary_language,
             "team_id": str(repo_data.team_id) if repo_data.team_id else None,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
-        result = supabase.table("github_repositories").insert(repo_record).execute()
-        return GitHubRepository(**result.data[0])
+        result = (
+            await supabase_client.table("github_repositories")
+            .insert(repo_record)
+            .execute()
+        ).data
+        return GitHubRepository(**result[0])
 
     async def get_repository_by_full_name(
-        self, full_name: str
+        self, full_name: str, supabase_client: AsyncClient
     ) -> Optional[GitHubRepository]:
-        """Get repository by full name (org/repo)"""
-        from ..db.database import get_service_client
+        """Get repository by full name (org/repo)."""
 
-        supabase = get_service_client()  # Use service role for system operations
-
-        result = (
-            supabase.table("github_repositories")
+        repo = (
+            await supabase_client.table("github_repositories")
             .select("*")
             .eq("full_name", full_name)
             .execute()
-        )
-        if result.data:
-            return GitHubRepository(**result.data[0])
-        return None
+        ).data
+        return GitHubRepository(**repo[0]) if repo else None
 
-    async def get_repository_context(self, full_name: str) -> Dict:
-        """Gather comprehensive repository context for AI analysis"""
-        if not self.github_client:
-            logger.warning("GitHub client not configured")
-            return {}
-
+    async def get_repository_context(
+        self, full_name: str, supabase_client: AsyncClient
+    ) -> Dict:
+        """Gather comprehensive repository context for AI analysis."""
         try:
             repo = self.github_client.get_repo(full_name)
 
-            # Get recent commits (last 10)
+            # Get recent commits
             commits = []
-            for commit in repo.get_commits()[:10]:
+            for commit in islice(repo.get_commits(), 20):
                 commits.append(
                     {
                         "sha": commit.sha,
@@ -172,9 +126,9 @@ class GitHubService:
                     }
                 )
 
-            # Get open PRs
+            # Get recent PRs
             open_prs = []
-            for pr in repo.get_pulls(state="open"):
+            for pr in islice(repo.get_pulls(state="all"), 20):
                 open_prs.append(
                     {
                         "number": pr.number,
@@ -187,8 +141,8 @@ class GitHubService:
 
             # Get recent issues
             recent_issues = []
-            for issue in repo.get_issues(state="all")[:20]:
-                if not issue.pull_request:  # Exclude PRs
+            for issue in islice(repo.get_issues(state="all"), 20):
+                if not issue.pull_request:
                     recent_issues.append(
                         {
                             "number": issue.number,
@@ -196,9 +150,7 @@ class GitHubService:
                             "state": issue.state,
                             "labels": [label.name for label in issue.labels],
                             "created_at": issue.created_at.isoformat(),
-                            "body": (
-                                issue.body[:500] if issue.body else ""
-                            ),  # Truncate for context
+                            "body": (issue.body[:500] if issue.body else ""),
                         }
                     )
 
@@ -221,11 +173,8 @@ class GitHubService:
                 "open_prs": open_prs,
                 "recent_issues": recent_issues,
                 "file_structure": key_files,
-                "last_updated": datetime.utcnow().isoformat(),
+                "last_updated": datetime.now(timezone.utc).isoformat(),
             }
-
-            # Cache this context
-            await self._cache_repository_context(full_name, context)
 
             return context
 
@@ -233,7 +182,9 @@ class GitHubService:
             logger.error(f"GitHub API error for {full_name}: {e}")
             return {}
         except Exception as e:
-            logger.error(f"Unexpected error getting context for {full_name}: {e}")
+            logger.error(
+                f"Unexpected error getting context for {full_name}: {e.with_traceback()}"
+            )
             return {}
 
     async def _get_key_files_structure(self, repo) -> List[Dict]:
@@ -267,49 +218,10 @@ class GitHubService:
 
         return key_files
 
-    async def _cache_repository_context(self, full_name: str, context: Dict):
-        """Cache repository context in database"""
-        supabase = get_supabase()
-
-        # Get repository ID
-        repo_result = (
-            supabase.table("github_repositories")
-            .select("id")
-            .eq("full_name", full_name)
-            .execute()
-        )
-        if not repo_result.data:
-            return
-
-        repo_id = repo_result.data[0]["id"]
-
-        # Update or insert context
-        context_record = {
-            "repo_id": repo_id,
-            "context_type": "full_context",
-            "context_data": context,
-            "last_updated": datetime.utcnow().isoformat(),
-        }
-
-        existing = (
-            supabase.table("repository_context")
-            .select("id")
-            .eq("repo_id", repo_id)
-            .eq("context_type", "full_context")
-            .execute()
-        )
-
-        if existing.data:
-            supabase.table("repository_context").update(context_record).eq(
-                "id", existing.data[0]["id"]
-            ).execute()
-        else:
-            supabase.table("repository_context").insert(context_record).execute()
-
     async def handle_ci_failure_webhook(
-        self, payload: GitHubWebhookPayload
+        self, payload: GitHubWebhookPayload, supabase_client: AsyncClient
     ) -> Optional[UUID]:
-        """Handle CI failure webhook and create ticket"""
+        """Handle CI failure webhook and create a ticket."""
         if payload.action not in ["completed"] or not payload.workflow_run:
             return None
 
@@ -318,15 +230,14 @@ class GitHubService:
             return None
 
         full_name = payload.repository["full_name"]
-        repo = await self.get_repository_by_full_name(full_name)
+        repo = await self.get_repository_by_full_name(full_name, supabase_client)
 
         if not repo or not repo.id:
             logger.warning(f"Repository {full_name} not found in database")
             return None
 
-        # Create CI failure record
         ci_failure_data = CIFailureCreate(
-            repo_id=repo.id,
+            repo_id=str(repo.id),
             workflow_name=workflow_run.get("name", "Unknown"),
             commit_sha=workflow_run.get("head_sha", ""),
             branch_name=workflow_run.get("head_branch", "main"),
@@ -334,29 +245,20 @@ class GitHubService:
             logs=await self._get_workflow_logs(full_name, workflow_run.get("id") or 0),
         )
 
-        from ..db.database import get_service_client
-
-        supabase = get_service_client()  # Use service role for system operations
-        ci_failure_record = {
-            "repo_id": str(ci_failure_data.repo_id),
-            "workflow_name": ci_failure_data.workflow_name,
-            "commit_sha": ci_failure_data.commit_sha,
-            "branch_name": ci_failure_data.branch_name,
-            "failure_reason": ci_failure_data.failure_reason,
-            "logs": ci_failure_data.logs,
-            "created_at": datetime.utcnow().isoformat(),
-        }
-
-        ci_result = supabase.table("ci_failures").insert(ci_failure_record).execute()
-        ci_failure_id = ci_result.data[0]["id"]
+        ci_failure = (
+            await supabase_client.table("ci_failures")
+            .insert(ci_failure_data.model_dump())
+            .execute()
+        ).data
+        ci_failure_id = ci_failure[0]["id"]
 
         # Create automated ticket
-        repo_context = await self.get_repository_context(full_name)
+
+        repo_context = await self.get_repository_context(full_name, supabase_client)
         ticket_description = self._format_ci_failure_description(
             ci_failure_data, repo_context, payload
         )
 
-        # Ensure we have a valid team_id - if repo has no team, skip ticket creation
         if not repo.team_id:
             logger.warning(
                 f"Repository {full_name} has no team_id, cannot create ticket"
@@ -367,34 +269,22 @@ class GitHubService:
             team_id=repo.team_id,
             title=f"CI Failure: {ci_failure_data.workflow_name} in {repo.repo_name}",
             description=ticket_description,
-            status=TicketStatus.OPEN,
             priority=TicketPriority.HIGH,
         )
 
-        # Create ticket through ticket service using service client and CI bot
-        CI_BOT_UUID = "00000000-0000-4000-8000-000000000001"  # CI Automation Bot
-        # Get CI bot actor ID
-        from ..services.actor_service import ActorService
+        ci_bot_actor = await _get_ci_bot_actor(supabase_client)
 
-        ci_bot_actor = await ActorService.get_actor_for_system_user(
-            UUID(CI_BOT_UUID), client=supabase
-        )
-
-        if not ci_bot_actor:
-            logger.error("CI Bot actor not found")
-            return None
-
-        ticket = await self.ticket_service.create_ticket(
-            ticket_data, ci_bot_actor.id, client=supabase
+        ticket = await TicketService.create_ticket(
+            ticket_data, ci_bot_actor.id, supabase_client
         )
 
         # Link CI failure to ticket
-        supabase.table("ci_failures").update({"ticket_id": str(ticket.id)}).eq(
-            "id", ci_failure_id
-        ).execute()
+        await supabase_client.table("ci_failures").update(
+            {"ticket_id": str(ticket.id)}
+        ).eq("id", ci_failure_id).execute()
 
         # Auto-tag the ticket
-        await self.ticket_service.add_tags(
+        await TicketService.add_tags(
             ticket.id,
             [
                 "ci-failure",
@@ -402,7 +292,8 @@ class GitHubService:
                 repo.repo_name,
                 repo.primary_language or "unknown",
             ],
-            client=supabase,
+            ci_bot_actor.id,
+            supabase_client,
         )
 
         logger.info(f"Created ticket {ticket.id} for CI failure in {full_name}")
@@ -448,11 +339,8 @@ class GitHubService:
 
         return description
 
-    async def _get_workflow_logs(self, full_name: str, run_id: int) -> Optional[str]:
-        """Get workflow logs from GitHub API"""
-        if not self.github_token:
-            return None
-
+    async def _get_workflow_logs(self, full_name: str, run_id: int) -> str:
+        """Get workflow logs from GitHub API."""
         try:
             async with httpx.AsyncClient(follow_redirects=True) as client:
                 headers = {
@@ -460,7 +348,6 @@ class GitHubService:
                     "Accept": "application/vnd.github.v3+json",
                 }
 
-                # Get workflow jobs
                 response = await client.get(
                     f"https://api.github.com/repos/{full_name}/actions/runs/{run_id}/jobs",
                     headers=headers,
@@ -475,7 +362,6 @@ class GitHubService:
                             logs.append(f"Job: {job.get('name', 'Unknown')}")
                             logs.append(f"Conclusion: {job.get('conclusion')}")
 
-                            # Get detailed logs for this job
                             job_id = job.get("id")
                             if job_id:
                                 try:
@@ -487,7 +373,6 @@ class GitHubService:
                                         job_logs = log_response.text
 
                                         if job_logs.strip():
-                                            # Extract relevant error lines (last 50 lines or error-containing lines)
                                             log_lines = job_logs.split("\n")
                                             error_lines = [
                                                 line
@@ -510,7 +395,6 @@ class GitHubService:
                                                 logs.append("Error details:")
                                                 logs.extend(error_lines)
                                             else:
-                                                # If no specific errors, get last 40 lines of meaningful content
                                                 logs.append("Last output:")
                                                 relevant_lines = [
                                                     line
@@ -521,7 +405,6 @@ class GitHubService:
                                         else:
                                             logs.append("Logs were empty")
 
-                                        # Also add job steps information
                                         steps = job.get("steps", [])
                                         failed_steps = [
                                             step
@@ -549,7 +432,6 @@ class GitHubService:
                                         f"Could not fetch detailed logs: {log_error}"
                                     )
 
-                            # Add additional job context
                             logs.append(f"Job URL: {job.get('html_url', 'N/A')}")
                             logs.append(f"Started at: {job.get('started_at', 'N/A')}")
                             logs.append(
@@ -566,17 +448,20 @@ class GitHubService:
         return "Logs unavailable"
 
     async def list_repositories(
-        self, team_id: Optional[UUID] = None
+        self, team_id: Optional[UUID], supabase_client: AsyncClient
     ) -> List[GitHubRepository]:
-        """List GitHub repositories, optionally filtered by team"""
-        supabase = get_supabase()
+        """List GitHub repositories, optionally filtered by team."""
 
-        query = supabase.table("github_repositories").select("*").eq("is_active", True)
+        query = (
+            supabase_client.table("github_repositories")
+            .select("*")
+            .eq("is_active", True)
+        )
         if team_id:
             query = query.eq("team_id", str(team_id))
 
-        result = query.execute()
-        return [GitHubRepository(**repo) for repo in result.data]
+        repos = (await query.execute()).data
+        return [GitHubRepository(**repo) for repo in repos]
 
     async def analyze_recent_commits(
         self, full_name: str, failure_time: datetime, max_commits: int = 50
@@ -1373,5 +1258,4 @@ class GitHubService:
         return sorted(list(directories))
 
 
-# Global instance
 github_service = GitHubService()

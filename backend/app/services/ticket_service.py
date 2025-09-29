@@ -106,7 +106,7 @@ class TicketService:
         page: int,
         page_size: int,
         team_id: Optional[UUID],
-        status_filter: Optional[TicketStatus],
+        status: Optional[TicketStatus],
         priority: Optional[TicketPriority],
         assignee_id: Optional[UUID],
         tag_names: Optional[List[str]],
@@ -122,8 +122,8 @@ class TicketService:
         if team_id:
             query = query.eq("team_id", str(team_id))
 
-        if status_filter:
-            query = query.eq("status", status_filter.value)
+        if status:
+            query = query.eq("status", status.value)
 
         if priority:
             query = query.eq("priority", priority.value)
@@ -195,7 +195,9 @@ class TicketService:
         else:
             query = query.limit(page_size).offset(offset)
 
-        tickets = (await query.execute()).data
+        result = await query.execute()
+        tickets = result.data
+        total_count = result.count
 
         hydrated_tickets = await asyncio.gather(
             *[
@@ -204,10 +206,9 @@ class TicketService:
             ]
         )
 
-        ticket_count = len(tickets)
         return {
             "tickets": hydrated_tickets,
-            "total": ticket_count,
+            "total": total_count,
             "page": page,
             "page_size": page_size,
         }

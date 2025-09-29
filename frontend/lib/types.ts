@@ -137,12 +137,11 @@ export interface TicketFilters {
   status?: TicketStatus;
   priority?: TicketPriority;
   assignee_id?: string;
-  tags?: string[];
+  tag_names?: string[];
   commented_by?: string;
-  q?: string;
+  search_query?: string;
   page?: number;
   page_size?: number;
-  // For backend filtering - will be populated by backend based on current user
   created_by_me?: boolean;
 }
 

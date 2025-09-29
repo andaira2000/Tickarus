@@ -41,7 +41,7 @@ function TicketsContent() {
   const buildFilters = (extraFilters = {}) => ({
     page: currentPage,
     page_size: pageSize,
-    q: debouncedSearchQuery || undefined,
+    search_query: debouncedSearchQuery || undefined,
     status: statusFilter !== 'all' ? (statusFilter as TicketStatus) : undefined,
     priority: priorityFilter !== 'all' ? (priorityFilter as TicketPriority) : undefined,
     ...extraFilters,

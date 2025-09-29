@@ -1,21 +1,22 @@
 from typing import List
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
+
 from fastapi import HTTPException, status as http_status
-from app.db.database import get_supabase, exec_query, exec_single, first_row
+from supabase import AsyncClient
+
 from app.models.comment import Comment, CommentCreate, CommentUpdate
 
 
 class CommentService:
     @staticmethod
-    def _c():
-        return get_supabase()
-
-    @classmethod
-    async def create_comment(cls, payload: CommentCreate, actor_id: UUID, client=None) -> Comment:
-        c = client or cls._c()
-        resp = exec_query(
-            c.table("comments").insert(
+    async def create_comment(
+        payload: CommentCreate, actor_id: UUID, supabase_client: AsyncClient
+    ) -> Comment:
+        """Create a new comment on a ticket."""
+        comment = (
+            await supabase_client.table("comments")
+            .insert(
                 {
                     "ticket_id": str(payload.ticket_id),
                     "actor_id": str(actor_id),
@@ -23,20 +24,20 @@ class CommentService:
                 },
                 returning="representation",
             )
-        )
-        row = first_row(resp.data)
-        if not row:
-            raise HTTPException(
-                http_status.HTTP_400_BAD_REQUEST, "Create comment failed"
-            )
-        return Comment(**row)
+            .execute()
+        ).data[0]
 
-    @classmethod
-    async def list_comments(cls, ticket_id: UUID) -> List[Comment]:
-        c = cls._c()
-        resp = exec_query(
-            c.table("comments")
-            .select("""
+        return Comment(**comment)
+
+    @staticmethod
+    async def list_comments(
+        ticket_id: UUID, supabase_client: AsyncClient
+    ) -> List[Comment]:
+        """List comments for a ticket, with actor info hydrated."""
+        comments = (
+            await supabase_client.table("comments")
+            .select(
+                """
                 *,
                 actors:actor_id(
                     id,
@@ -44,58 +45,91 @@ class CommentService:
                     profiles:profile_id(id, full_name, username, avatar_url),
                     system_users:system_user_id(id, name, type, description)
                 )
-            """)
+            """
+            )
             .eq("ticket_id", str(ticket_id))
             .order("created_at", desc=False)
-        )
-        
-        # Hydrate with actor info
-        comments = []
-        for comment_data in (resp.data or []):
-            if comment_data.get("actors"):
-                actor = comment_data["actors"]
+            .execute()
+        ).data
+
+        hydrated_comments = []
+        for comment in comments:
+            if comment.get("actors"):
+                actor = comment["actors"]
                 if actor["actor_type"] == "human" and actor.get("profiles"):
                     from ..models.actor import ActorInfo
-                    comment_data["author_info"] = ActorInfo.from_human_profile(
+
+                    comment["author_info"] = ActorInfo.from_human_profile(
                         UUID(actor["id"]), actor["profiles"]
-                    ).dict()
+                    ).model_dump()
                 elif actor["actor_type"] == "system" and actor.get("system_users"):
                     from ..models.actor import ActorInfo
-                    comment_data["author_info"] = ActorInfo.from_system_user(
-                        UUID(actor["id"]), actor["system_users"]
-                    ).dict()
-            
-            # Remove nested actors data
-            comment_data.pop("actors", None)
-            comments.append(Comment(**comment_data))
-            
-        return comments
 
-    @classmethod
+                    comment["author_info"] = ActorInfo.from_system_user(
+                        UUID(actor["id"]), actor["system_users"]
+                    ).model_dump()
+
+            comment.pop("actors", None)
+            hydrated_comments.append(Comment(**comment))
+
+        return hydrated_comments
+
+    @staticmethod
     async def update_comment(
-        cls, comment_id: UUID, patch: CommentUpdate, actor_id: UUID
+        comment_id: UUID,
+        patch: CommentUpdate,
+        actor_id: UUID,
+        supabase_client: AsyncClient,
     ) -> Comment:
-        c = cls._c()
-        resp = exec_query(
-            c.table("comments")
+        """Update a comment's content."""
+        existing = (
+            await supabase_client.table("comments")
+            .select("*")
+            .eq("id", str(comment_id))
+            .single()
+            .execute()
+        ).data
+
+        if existing["actor_id"] != str(actor_id):
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to update this comment",
+            )
+
+        comment = (
+            await supabase_client.table("comments")
             .update(
-                {"content": patch.content, "updated_at": datetime.utcnow().isoformat()},
+                {
+                    "content": patch.content,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                },
                 returning="representation",
             )
             .eq("id", str(comment_id))
-        )
-        row = first_row(resp.data)
-        if not row:
-            exec_single(
-                c.table("comments").select("*").eq("id", str(comment_id)),
-                not_found_msg="Comment not found",
-            )
-            raise HTTPException(
-                http_status.HTTP_400_BAD_REQUEST, "Update comment failed"
-            )
-        return Comment(**row)
+            .execute()
+        ).data[0]
 
-    @classmethod
-    async def delete_comment(cls, comment_id: UUID, actor_id: UUID) -> None:
-        c = cls._c()
-        exec_query(c.table("comments").delete().eq("id", str(comment_id)))
+        return Comment(**comment)
+
+    @staticmethod
+    async def delete_comment(
+        comment_id: UUID, actor_id: UUID, supabase_client: AsyncClient
+    ) -> None:
+        """Delete a comment."""
+        existing = (
+            await supabase_client.table("comments")
+            .select("*")
+            .eq("id", str(comment_id))
+            .single()
+            .execute()
+        ).data
+
+        if existing["actor_id"] != str(actor_id):
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to delete this comment",
+            )
+
+        await supabase_client.table("comments").delete().eq(
+            "id", str(comment_id)
+        ).execute()

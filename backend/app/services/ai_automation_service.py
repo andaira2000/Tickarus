@@ -104,7 +104,9 @@ class AIAutomationService:
             # Perform root cause analysis
             logger.info(f"Starting AI root cause analysis for ticket {ticket_id}")
             analysis = await rootcause_service.analyze_ticket(
-                ticket_id=ticket_id, user_id=None, client=c  # System operation with service client
+                ticket_id=ticket_id,
+                user_id=None,
+                client=c,  # System operation with service client
             )
 
             # Format analysis as a comment

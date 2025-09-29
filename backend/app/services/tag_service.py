@@ -43,6 +43,24 @@ class TagService:
             return Tag(**tag)
 
     @staticmethod
+    async def get_tags_by_names(
+        names: List[str], supabase_client: AsyncClient
+    ) -> List[Tag]:
+        """Get tags by their names."""
+        if not names:
+            return []
+
+        lower_names = [name.lower() for name in names]
+        tags = (
+            await supabase_client.table("tags")
+            .select("*")
+            .in_("name", lower_names)
+            .execute()
+        ).data
+
+        return [Tag(**tag) for tag in tags]
+
+    @staticmethod
     async def get_all_tags(supabase_client: AsyncClient) -> List[Tag]:
         """Get all tags, standard tags first, then custom tags alphabetically."""
         tags = (

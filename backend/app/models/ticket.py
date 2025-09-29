@@ -27,13 +27,17 @@ class TicketBase(BaseModel):
     team_id: UUID
     title: str = Field(..., min_length=1, max_length=280)
     description: str = Field(..., min_length=1)
-    status: Optional[TicketStatus] = TicketStatus.OPEN
-    priority: Optional[TicketPriority] = TicketPriority.MEDIUM
+    status: TicketStatus
+    priority: TicketPriority
+    assignee_id: Optional[UUID]
+
+
+class TicketCreate(BaseModel):
+    team_id: UUID
+    title: str = Field(..., min_length=1, max_length=280)
+    description: str = Field(..., min_length=1)
+    priority: TicketPriority
     assignee_id: Optional[UUID] = None
-
-
-class TicketCreate(TicketBase):
-    pass
 
 
 class TicketUpdate(BaseModel):
@@ -46,15 +50,14 @@ class TicketUpdate(BaseModel):
 
 
 class Ticket(TicketBase, BaseDBModel):
-    actor_id: UUID  # Reference to actors table (replaces created_by and created_by_system_user_id)
+    # Hydrated fields
+    actor_id: UUID
     updated_at: Optional[datetime] = None
     last_activity_at: Optional[datetime] = None
-    # optional expansions
     tags: Optional[List[str]] = []
-    comments_count: Optional[int] = 0
+    comment_count: Optional[int] = 0
     team_name: Optional[str] = None
-    # actor info for display
-    creator_info: Optional[dict] = None  # Will be populated with ActorInfo data
+    creator_info: Optional[dict] = None
 
 
 class TicketList(BaseModel):

@@ -1,14 +1,17 @@
+from typing import Optional, List, Dict, Any
+from uuid import UUID
+
 from fastapi import (
     APIRouter,
     Depends,
     Query,
     HTTPException,
     status as http_status,
-    Body,
 )
-from typing import Optional, List, Dict, Any
-from uuid import UUID
-from app.api.dependencies import get_current_user_id
+from pydantic import BaseModel
+from supabase import AsyncClient
+
+from app.api.dependencies import get_current_user_id, get_supabase_request_client
 from app.models.ticket import (
     Ticket,
     TicketCreate,
@@ -17,7 +20,7 @@ from app.models.ticket import (
     TicketStatus,
     TicketPriority,
 )
-from pydantic import BaseModel
+from app.services.actor_service import ActorService
 from app.services.ticket_service import TicketService
 
 router = APIRouter()
@@ -44,16 +47,18 @@ class SimilarityClickRequest(BaseModel):
 
 @router.post("", response_model=Ticket)
 async def create_ticket(
-    ticket: TicketCreate, current_user_id: UUID = Depends(get_current_user_id)
+    ticket_data: TicketCreate,
+    current_user_id: UUID = Depends(get_current_user_id),
+    supabase_client: AsyncClient = Depends(get_supabase_request_client),
 ):
-    # Get the actor ID for the current user
-    from app.services.actor_service import ActorService
+    """Create a new ticket on behalf of a human user."""
+    user_actor = await ActorService.get_actor_for_human_user(
+        current_user_id, supabase_client
+    )
 
-    user_actor = await ActorService.get_actor_for_user(current_user_id)
-    if not user_actor:
-        raise HTTPException(http_status.HTTP_400_BAD_REQUEST, "User actor not found")
-
-    return await TicketService.create_ticket(ticket, user_actor.id)
+    return await TicketService.create_ticket(
+        ticket_data, user_actor.id, supabase_client
+    )
 
 
 @router.get("", response_model=TicketList)
@@ -61,66 +66,65 @@ async def list_tickets(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     team_id: Optional[UUID] = None,
-    status: Optional[TicketStatus] = None,
+    status_filter: Optional[TicketStatus] = None,
     priority: Optional[TicketPriority] = None,
     assignee_id: Optional[UUID] = None,
-    tags: Optional[List[str]] = Query(
-        None, description="Filter by tag names (any match)"
-    ),
+    tag_names: Optional[List[str]] = None,
     commented_by: Optional[UUID] = None,
-    q: Optional[str] = Query(None, description="Keyword search"),
+    search_query: Optional[str] = None,
     created_by_me: Optional[bool] = None,
     current_user_id: UUID = Depends(get_current_user_id),
+    supabase_client: AsyncClient = Depends(get_supabase_request_client),
 ):
-    # Get current user's actor ID if needed for created_by_me filter
-    current_user_actor_id = None
-    if created_by_me:
-        from app.services.actor_service import ActorService
-
-        user_actor = await ActorService.get_actor_for_user(current_user_id)
-        if user_actor:
-            current_user_actor_id = user_actor.id
-
-    result = await TicketService.list_tickets(
-        page=page,
-        page_size=page_size,
-        team_id=team_id,
-        status_filter=status,
-        priority=priority,
-        assignee_id=assignee_id,
-        tag_names=tags,
-        commented_by=commented_by,
-        search_query=q,
-        created_by_me=created_by_me,
-        current_user_actor_id=current_user_actor_id,
+    """List tickets with optional filtering, searching, and pagination."""
+    ticket_list = await TicketService.list_tickets(
+        page,
+        page_size,
+        team_id,
+        status_filter,
+        priority,
+        assignee_id,
+        tag_names,
+        commented_by,
+        search_query,
+        created_by_me,
+        current_user_id,
+        supabase_client,
     )
-    return TicketList(**result)
+
+    return TicketList(**ticket_list)
 
 
 @router.get("/{ticket_id}", response_model=Ticket)
 async def get_ticket(
-    ticket_id: UUID, current_user_id: UUID = Depends(get_current_user_id)
+    ticket_id: UUID, supabase_client: AsyncClient = Depends(get_supabase_request_client)
 ):
-    return await TicketService.get_ticket(ticket_id)
+    """Get ticket details by ID."""
+    return await TicketService.get_ticket(ticket_id, supabase_client)
 
 
 @router.patch("/{ticket_id}", response_model=Ticket)
 async def update_ticket(
     ticket_id: UUID,
     patch: TicketUpdate,
-    current_user_id: UUID = Depends(get_current_user_id),
+    supabase_client: AsyncClient = Depends(get_supabase_request_client),
 ):
-    return await TicketService.update_ticket(ticket_id, patch)
+    """Update ticket details."""
+    return await TicketService.update_ticket(ticket_id, patch, supabase_client)
 
 
-# Tag management on a ticket
 @router.post("/{ticket_id}/tags")
 async def add_tags(
     ticket_id: UUID,
     names: List[str],
     current_user_id: UUID = Depends(get_current_user_id),
+    supabase_client: AsyncClient = Depends(get_supabase_request_client),
 ):
-    await TicketService.add_tags(ticket_id, names)
+    """Add tags to a ticket."""
+    user_actor = await ActorService.get_actor_for_human_user(
+        current_user_id, supabase_client
+    )
+    await TicketService.add_tags(ticket_id, names, user_actor.id, supabase_client)
     return {"message": "Tags added"}
 
 
@@ -128,26 +132,38 @@ async def add_tags(
 async def remove_tags(
     ticket_id: UUID,
     names: List[str],
-    current_user_id: UUID = Depends(get_current_user_id),
+    supabase_client: AsyncClient = Depends(get_supabase_request_client),
 ):
-    await TicketService.remove_tags(ticket_id, names)
+    """Remove tags from a ticket."""
+    await TicketService.remove_tags(ticket_id, names, supabase_client)
     return {"message": "Tags removed"}
 
 
-# Watch / Unwatch
 @router.post("/{ticket_id}/watch")
 async def watch_ticket(
-    ticket_id: UUID, current_user_id: UUID = Depends(get_current_user_id)
+    ticket_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id),
+    supabase_client: AsyncClient = Depends(get_supabase_request_client),
 ):
-    await TicketService.watch(ticket_id, current_user_id)
+    """Watch a ticket to receive notifications on updates."""
+    actor = await ActorService.get_actor_for_human_user(
+        current_user_id, supabase_client
+    )
+    await TicketService.watch(ticket_id, actor.id, supabase_client)
     return {"message": "Now watching ticket"}
 
 
 @router.delete("/{ticket_id}/watch")
 async def unwatch_ticket(
-    ticket_id: UUID, current_user_id: UUID = Depends(get_current_user_id)
+    ticket_id: UUID,
+    current_user_id: UUID = Depends(get_current_user_id),
+    supabase_client: AsyncClient = Depends(get_supabase_request_client),
 ):
-    await TicketService.unwatch(ticket_id, current_user_id)
+    """Stop watching a ticket."""
+    actor = await ActorService.get_actor_for_human_user(
+        current_user_id, supabase_client
+    )
+    await TicketService.unwatch(ticket_id, actor.id, supabase_client)
     return {"message": "Stopped watching ticket"}
 
 
@@ -158,12 +174,13 @@ async def get_similar_tickets(
         5, ge=1, le=20, description="Number of similar tickets to return"
     ),
     current_user_id: UUID = Depends(get_current_user_id),
+    supabase_client: AsyncClient = Depends(get_supabase_request_client),
 ):
     """Get tickets similar to the specified ticket"""
     from app.services.similarity_service import similarity_service
 
     # Get the ticket details first
-    ticket = await TicketService.get_ticket(ticket_id)
+    ticket = await TicketService.get_ticket(ticket_id, supabase_client)
     if not ticket:
         raise HTTPException(http_status.HTTP_404_NOT_FOUND, "Ticket not found")
 

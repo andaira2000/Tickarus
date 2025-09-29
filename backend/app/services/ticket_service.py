@@ -1,7 +1,13 @@
+import logging
 from typing import List, Optional, Dict, Any
 from uuid import UUID
+
+import asyncio
 from fastapi import HTTPException, status as http_status
-from app.db.database import get_supabase, exec_query, exec_single, first_row
+from supabase import AsyncClient
+
+from app.models.actor import ActorInfo
+from app.models.tag import TagCreate
 from app.models.ticket import (
     TicketCreate,
     TicketUpdate,
@@ -10,337 +16,324 @@ from app.models.ticket import (
     TicketPriority,
 )
 
+from app.services.actor_service import ActorService
+
+# from app.services.ai_automation_service import AIAutomationService
+from app.services.tag_service import TagService
+
+
+logger = logging.getLogger(__name__)
+
 
 class TicketService:
     @staticmethod
-    def _c():
-        return get_supabase()
-
-    @classmethod
     async def create_ticket(
-        cls, data: TicketCreate, actor_id: UUID, client=None
+        ticket_data: TicketCreate, actor_id: UUID, supabase_client: AsyncClient
     ) -> Ticket:
-        c = client or cls._c()
-
+        """Create a new ticket."""
         payload = {
-            "team_id": str(data.team_id),
-            "title": data.title,
-            "description": data.description,
-            "status": (
-                data.status.value
-                if isinstance(data.status, TicketStatus)
-                else data.status
-            )
-            or "open",
-            "priority": (
-                data.priority.value
-                if isinstance(data.priority, TicketPriority)
-                else data.priority
-            )
-            or "medium",
-            "assignee_id": str(data.assignee_id) if data.assignee_id else None,
+            "team_id": str(ticket_data.team_id),
+            "title": ticket_data.title,
+            "description": ticket_data.description,
+            "status": "open",
+            "priority": ticket_data.priority.value,
+            "assignee_id": (
+                str(ticket_data.assignee_id) if ticket_data.assignee_id else None
+            ),
             "actor_id": str(actor_id),
         }
-        resp = exec_query(
-            c.table("tickets").insert(payload, returning="representation")
+
+        ticket = Ticket(
+            **(
+                await supabase_client.table("tickets")
+                .insert(payload, returning="representation")
+                .execute()
+            ).data[0]
         )
-        row = first_row(resp.data)
-        if not row:
-            raise HTTPException(
-                http_status.HTTP_400_BAD_REQUEST, "Create ticket failed"
-            )
 
-        ticket = await cls._hydrate_ticket(row, client=c)
+        ticket = await TicketService._hydrate_ticket(ticket, supabase_client)
 
-        # Trigger AI automation for CI-created tickets (fire and forget)
-        try:
-            from app.services.ai_automation_service import AIAutomationService
-            import asyncio
+        # def ai_automation_callback(task: asyncio.Task):
+        #     if task.exception():
+        #         logger.error(
+        #             f"AI automation failed for ticket {ticket.id}: {str(task.exception())}"
+        #         )
+        #     else:
+        #         logger.info(f"AI automation completed for ticket {ticket.id}")
 
-            asyncio.create_task(
-                AIAutomationService.handle_ticket_created(ticket.id, actor_id)
-            )
-        except Exception as e:
-            # Don't fail ticket creation if AI automation fails
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.warning(f"AI automation failed for ticket {ticket.id}: {str(e)}")
+        # asyncio.create_task(
+        #     AIAutomationService.handle_ticket_created(ticket.id, actor_id)
+        # ).add_done_callback(ai_automation_callback)
 
         return ticket
 
-    @classmethod
-    async def get_ticket(cls, ticket_id: UUID) -> Ticket:
-        c = cls._c()
-        resp = exec_single(
-            c.table("tickets").select("*").eq("id", str(ticket_id)),
-            not_found_msg="Ticket not found",
+    @staticmethod
+    async def get_ticket(ticket_id: UUID, supabase_client: AsyncClient) -> Ticket:
+        ticket = Ticket(
+            **(
+                await supabase_client.table("tickets")
+                .select("*")
+                .eq("id", str(ticket_id))
+                .single()
+                .execute()
+            ).data
         )
-        return await cls._hydrate_ticket(resp.data, client=c)
 
-    @classmethod
-    async def update_ticket(cls, ticket_id: UUID, patch: TicketUpdate) -> Ticket:
-        c = cls._c()
-        payload: Dict[str, Any] = {}
-        if patch.title is not None:
-            payload["title"] = patch.title
-        if patch.description is not None:
-            payload["description"] = patch.description
-        if patch.status is not None:
-            payload["status"] = (
-                patch.status.value
-                if isinstance(patch.status, TicketStatus)
-                else patch.status
-            )
-        if patch.priority is not None:
-            payload["priority"] = (
-                patch.priority.value
-                if isinstance(patch.priority, TicketPriority)
-                else patch.priority
-            )
-        if patch.assignee_id is not None:
-            payload["assignee_id"] = (
-                str(patch.assignee_id) if patch.assignee_id else None
-            )
-        if patch.team_id is not None:
-            payload["team_id"] = str(patch.team_id)
+        return await TicketService._hydrate_ticket(ticket, supabase_client)
+
+    @staticmethod
+    async def update_ticket(
+        ticket_id: UUID, patch: TicketUpdate, supabase_client: AsyncClient
+    ) -> Ticket:
+        payload = patch.model_dump(exclude_unset=True, exclude_none=True)
 
         if not payload:
-            return await cls.get_ticket(ticket_id)
+            return await TicketService.get_ticket(ticket_id, supabase_client)
 
-        resp = exec_query(
-            c.table("tickets")
-            .update(payload, returning="representation")
-            .eq("id", str(ticket_id))
+        ticket = Ticket(
+            **(
+                await supabase_client.table("tickets")
+                .update(payload, returning="representation")
+                .eq("id", str(ticket_id))
+                .execute()
+            ).data[0]
         )
-        row = first_row(resp.data)
-        if not row:
-            exec_single(
-                c.table("tickets").select("*").eq("id", str(ticket_id)),
-                not_found_msg="Ticket not found",
-            )
-            raise HTTPException(
-                http_status.HTTP_400_BAD_REQUEST, "Update ticket failed"
-            )
-        return await cls._hydrate_ticket(row, client=c)
 
-    @classmethod
+        return await TicketService._hydrate_ticket(ticket, supabase_client)
+
+    @staticmethod
     async def list_tickets(
-        cls,
-        page: int = 1,
-        page_size: int = 20,
-        team_id: Optional[UUID] = None,
-        status_filter: Optional[TicketStatus] = None,
-        priority: Optional[TicketPriority] = None,
-        assignee_id: Optional[UUID] = None,
-        tag_names: Optional[List[str]] = None,
-        commented_by: Optional[UUID] = None,
-        search_query: Optional[str] = None,
-        created_by_me: Optional[bool] = None,
-        current_user_actor_id: Optional[UUID] = None,
+        page: int,
+        page_size: int,
+        team_id: Optional[UUID],
+        status_filter: Optional[TicketStatus],
+        priority: Optional[TicketPriority],
+        assignee_id: Optional[UUID],
+        tag_names: Optional[List[str]],
+        commented_by: Optional[UUID],
+        search_query: Optional[str],
+        created_by_me: Optional[bool],
+        current_user_id: UUID,
+        supabase_client: AsyncClient,
     ):
-        c = cls._c()
-        q = c.table("tickets").select("*", count="exact")
+        """List tickets with optional filtering, searching, and pagination."""
+        query = supabase_client.table("tickets").select("*", count="exact")
 
         if team_id:
-            q = q.eq("team_id", str(team_id))
+            query = query.eq("team_id", str(team_id))
+
         if status_filter:
-            q = q.eq(
-                "status",
-                (
-                    status_filter.value
-                    if hasattr(status_filter, "value")
-                    else status_filter
-                ),
-            )
+            query = query.eq("status", status_filter.value)
+
         if priority:
-            q = q.eq(
-                "priority", priority.value if hasattr(priority, "value") else priority
-            )
+            query = query.eq("priority", priority.value)
+
         if assignee_id:
-            q = q.eq("assignee_id", str(assignee_id))
-        if created_by_me and current_user_actor_id:
-            q = q.eq("actor_id", str(current_user_actor_id))
+            query = query.eq("assignee_id", str(assignee_id))
+
+        if created_by_me:
+            user_actor = await ActorService.get_actor_for_human_user(
+                current_user_id, supabase_client
+            )
+            query = query.eq("actor_id", str(user_actor.id))
 
         if tag_names:
-            tags_resp = exec_query(
-                c.table("tags").select("id,name").in_("name", tag_names)
-            )
-            tag_ids = [t["id"] for t in (tags_resp.data or [])]
-            if tag_ids:
-                tt_resp = exec_query(
-                    c.table("ticket_tags").select("ticket_id").in_("tag_id", tag_ids)
-                )
-                tids = list({row["ticket_id"] for row in (tt_resp.data or [])})
-                if tids:
-                    q = q.in_("id", tids)
-                else:
-                    return {
-                        "tickets": [],
-                        "total": 0,
-                        "page": page,
-                        "page_size": page_size,
-                    }
-            else:
+            tags = await TagService.get_tags_by_names(tag_names, supabase_client)
+            tag_ids = [tag.id for tag in tags]
+
+            if not tag_ids:
                 return {"tickets": [], "total": 0, "page": page, "page_size": page_size}
 
-        if commented_by:
-            # Need to find tickets where this user (via their actor) has commented
-            # First get the user's actor ID
-            from ..services.actor_service import ActorService
+            tickets_with_tags = (
+                await supabase_client.table("ticket_tags")
+                .select("ticket_id")
+                .in_("tag_id", tag_ids)
+                .execute()
+            ).data
+            ticket_ids = list({ticket["ticket_id"] for ticket in tickets_with_tags})
 
-            user_actor = await ActorService.get_actor_for_user(commented_by)
+            if not ticket_ids:
+                return {
+                    "tickets": [],
+                    "total": 0,
+                    "page": page,
+                    "page_size": page_size,
+                }
+
+            query = query.in_("id", ticket_ids)
+
+        if commented_by:
+            user_actor = await ActorService.get_actor_for_human_user(
+                commented_by, supabase_client
+            )
             if not user_actor:
                 return {"tickets": [], "total": 0, "page": page, "page_size": page_size}
 
-            cm_resp = exec_query(
-                c.table("comments")
+            comments = (
+                await supabase_client.table("comments")
                 .select("ticket_id")
                 .eq("actor_id", str(user_actor.id))
-            )
-            tids = list({row["ticket_id"] for row in (cm_resp.data or [])})
-            if not tids:
-                return {"tickets": [], "total": 0, "page": page, "page_size": page_size}
-            q = q.in_("id", tids)
+                .execute()
+            ).data
 
-        # Apply ordering first
-        q = q.order("last_activity_at", desc=True)
+            ticket_ids = list({comment["ticket_id"] for comment in comments})
+            if not ticket_ids:
+                return {"tickets": [], "total": 0, "page": page, "page_size": page_size}
+            query = query.in_("id", ticket_ids)
+
+        query = query.order("last_activity_at", desc=True)
 
         # Apply search and pagination
+        offset = (page - 1) * page_size
         if search_query:
-            # Use text_search with the search_tsv column
-            q = q.text_search(
+            query = query.text_search(
                 "search_tsv", f"'{search_query}'", options={"config": "english"}
             )
-            # SyncFilterRequestBuilder doesn't have pagination methods
-            # Need to add pagination via params manually
-            offset = (page - 1) * page_size
-            q.params = q.params.add("limit", str(page_size)).add("offset", str(offset))
+            query.params = query.params.add("limit", str(page_size)).add(
+                "offset", str(offset)
+            )
         else:
-            # Apply pagination for regular SyncSelectRequestBuilder
-            offset = (page - 1) * page_size
-            q = q.limit(page_size).offset(offset)
+            query = query.limit(page_size).offset(offset)
 
-        resp = exec_query(q)
-        data = resp.data or []
-        hydrated = [await cls._hydrate_ticket(row, client=c) for row in data]
-        total = getattr(resp, "count", None) or 0
+        tickets = (await query.execute()).data
+
+        hydrated_tickets = await asyncio.gather(
+            *[
+                TicketService._hydrate_ticket(Ticket(**ticket), supabase_client)
+                for ticket in tickets
+            ]
+        )
+
+        ticket_count = len(tickets)
         return {
-            "tickets": hydrated,
-            "total": total,
+            "tickets": hydrated_tickets,
+            "total": ticket_count,
             "page": page,
             "page_size": page_size,
         }
 
-    @classmethod
-    async def add_tags(cls, ticket_id: UUID, tag_names: List[str], client=None) -> None:
-        c = client or cls._c()
+    @staticmethod
+    async def add_tags(
+        ticket_id: UUID,
+        tag_names: List[str],
+        actor_id: UUID,
+        supabase_client: AsyncClient,
+    ) -> None:
+        """Add tags to a ticket, creating any tags that don't already exist."""
         if not tag_names:
             return
-        for name in tag_names:
-            name_l = name.lower()
-            # try find
-            try:
-                existing = exec_single(c.table("tags").select("id").eq("name", name_l))
-                tag_id = existing.data["id"]
-            except Exception:
-                created = exec_query(
-                    c.table("tags").insert({"name": name_l}, returning="representation")
-                )
-                row = first_row(created.data)
-                if not row:
-                    raise HTTPException(
-                        http_status.HTTP_400_BAD_REQUEST,
-                        f"Failed to create tag '{name_l}'",
-                    )
-                tag_id = row["id"]
-            exec_query(
-                c.table("ticket_tags").upsert(
-                    {"ticket_id": str(ticket_id), "tag_id": tag_id},
-                    on_conflict="ticket_id,tag_id",
-                )
-            )
 
-    @classmethod
-    async def remove_tags(cls, ticket_id: UUID, tag_names: List[str]) -> None:
-        c = cls._c()
+        for name in tag_names:
+            tag = await TagService.create_tag(
+                TagCreate(name=name), actor_id, supabase_client
+            )
+            await supabase_client.table("ticket_tags").upsert(
+                {"ticket_id": str(ticket_id), "tag_id": str(tag.id)},
+                on_conflict="ticket_id,tag_id",
+                ignore_duplicates=True,
+            ).execute()
+
+    @staticmethod
+    async def remove_tags(
+        ticket_id: UUID, tag_names: List[str], supabase_client: AsyncClient
+    ) -> None:
+        """Remove tags from a ticket."""
         if not tag_names:
             return
-        tags_resp = exec_query(
-            c.table("tags").select("id").in_("name", [n.lower() for n in tag_names])
-        )
-        ids = [t["id"] for t in (tags_resp.data or [])]
+
+        tags = (
+            await supabase_client.table("tags")
+            .select("id")
+            .in_("name", [n.lower() for n in tag_names])
+            .execute()
+        ).data
+        ids = [tag["id"] for tag in tags]
+
         if ids:
-            exec_query(
-                c.table("ticket_tags")
+            (
+                await supabase_client.table("ticket_tags")
                 .delete()
                 .eq("ticket_id", str(ticket_id))
                 .in_("tag_id", ids)
+                .execute()
             )
 
-    @classmethod
-    async def watch(cls, ticket_id: UUID, user_id: UUID) -> None:
-        c = cls._c()
-        exec_query(
-            c.table("ticket_watchers").upsert(
-                {"ticket_id": str(ticket_id), "user_id": str(user_id)},
-                on_conflict="ticket_id,user_id",
-            )
-        )
+    @staticmethod
+    async def watch(
+        ticket_id: UUID, actor_id: UUID, supabase_client: AsyncClient
+    ) -> None:
+        """Add a watcher to a ticket."""
+        await supabase_client.table("ticket_watchers").upsert(
+            {"ticket_id": str(ticket_id), "actor_id": str(actor_id)},
+            on_conflict="ticket_id,actor_id",
+            ignore_duplicates=True,
+        ).execute()
 
-    @classmethod
-    async def unwatch(cls, ticket_id: UUID, user_id: UUID) -> None:
-        c = cls._c()
-        exec_query(
-            c.table("ticket_watchers")
-            .delete()
-            .match({"ticket_id": str(ticket_id), "user_id": str(user_id)})
-        )
+    @staticmethod
+    async def unwatch(
+        ticket_id: UUID, actor_id: UUID, supabase_client: AsyncClient
+    ) -> None:
+        """Remove a watcher from a ticket."""
+        await supabase_client.table("ticket_watchers").delete().match(
+            {"ticket_id": str(ticket_id), "actor_id": str(actor_id)}
+        ).execute()
 
-    @classmethod
-    async def _hydrate_ticket(cls, row: Dict[str, Any], client=None) -> Ticket:
-        c = client or cls._c()
-        tid = row["id"]
-        ttags = exec_query(
-            c.table("ticket_tags").select("tags(name)").eq("ticket_id", tid)
-        )
-        tags = [x["tags"]["name"] for x in (ttags.data or []) if x.get("tags")]
-        cc = exec_query(
-            c.table("comments").select("id", count="exact").eq("ticket_id", tid)
-        )
-        comments_count = getattr(cc, "count", None) or 0
-        team = exec_single(c.table("teams").select("name").eq("id", row["team_id"]))
-        team_name = team.data["name"]
+    @staticmethod
+    async def _hydrate_ticket(ticket: Ticket, supabase_client: AsyncClient) -> Ticket:
+        """Given a ticket row from the DB, populate related fields and return Ticket model."""
+        ticket_id = ticket.id
+
+        ticket_tags = (
+            await supabase_client.table("ticket_tags")
+            .select("tags(name)")
+            .eq("ticket_id", ticket_id)
+            .execute()
+        ).data
+
+        tag_names = [tag["tags"]["name"] for tag in ticket_tags if tag.get("tags")]
+
+        comment_count = (
+            await supabase_client.table("comments")
+            .select("id", count="exact", head=True)
+            .eq("ticket_id", ticket_id)
+            .execute()
+        ).count
+
+        team_name = (
+            await supabase_client.table("teams")
+            .select("name")
+            .eq("id", ticket.team_id)
+            .single()
+            .execute()
+        ).data["name"]
 
         # Get creator info from actors
         creator_info = None
-        if row.get("actor_id"):
-            actor_resp = exec_single(
-                c.table("actors")
-                .select(
-                    "*, profiles(full_name, username, avatar_url), system_users(name, type)"
-                )
-                .eq("id", row["actor_id"])
+
+        actor = (
+            await supabase_client.table("actors")
+            .select(
+                "*, profiles(full_name, username, avatar_url), system_users(name, type)"
             )
-            actor_data = actor_resp.data
-            if actor_data["actor_type"] == "human" and actor_data.get("profiles"):
-                from ..models.actor import ActorInfo
+            .eq("id", ticket.actor_id)
+            .single()
+            .execute()
+        ).data
 
-                creator_info = ActorInfo.from_human_profile(
-                    UUID(actor_data["id"]), actor_data["profiles"]
-                ).dict()
-            elif actor_data["actor_type"] == "system" and actor_data.get(
-                "system_users"
-            ):
-                from ..models.actor import ActorInfo
+        if actor["actor_type"] == "human" and actor.get("profiles"):
+            creator_info = ActorInfo.from_human_profile(
+                UUID(actor["id"]), actor["profiles"]
+            ).model_dump()
+        elif actor["actor_type"] == "system" and actor.get("system_users"):
+            creator_info = ActorInfo.from_system_user(
+                UUID(actor["id"]), actor["system_users"]
+            ).model_dump()
 
-                creator_info = ActorInfo.from_system_user(
-                    UUID(actor_data["id"]), actor_data["system_users"]
-                ).dict()
+        hydrated_ticket = dict(ticket)
 
-        row = dict(row)
-        row["tags"] = tags
-        row["comments_count"] = comments_count
-        row["team_name"] = team_name
-        row["creator_info"] = creator_info
-        return Ticket(**row)
+        hydrated_ticket["tags"] = tag_names
+        hydrated_ticket["comment_count"] = comment_count
+        hydrated_ticket["team_name"] = team_name
+        hydrated_ticket["creator_info"] = creator_info
+
+        return Ticket(**hydrated_ticket)

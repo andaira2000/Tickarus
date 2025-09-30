@@ -6,7 +6,7 @@ import logging
 from app.config import settings
 from app.logging import configure_logging
 from app.api.routes import (
-    # ai_chat,
+    ai_chat,
     auth,
     comments,
     # evaluation,
@@ -95,5 +95,5 @@ app.include_router(comments.router, prefix="/api/comments", tags=["comments"])
 app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
 app.include_router(github.router, prefix="/api", tags=["github"])
 # app.include_router(metrics.router, prefix="/api/metrics", tags=["metrics"])
-# app.include_router(ai_chat.router, prefix="/api/ai-chat", tags=["ai-chat"])
+app.include_router(ai_chat.router, prefix="/api/ai-chat", tags=["ai-chat"])
 # app.include_router(evaluation.router, prefix="/api", tags=["evaluation"])

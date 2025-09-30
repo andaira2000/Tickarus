@@ -73,11 +73,9 @@ class RepositoryContext(BaseModel):
 
 
 class GitHubWebhookPayload(BaseModel):
-    """Model for GitHub webhook payload"""
-
-    action: Optional[str] = None  # Not present in ping events
+    action: Optional[str] = None
     repository: dict
     workflow_run: Optional[dict] = None
     workflow_job: Optional[dict] = None
     sender: dict
-    zen: Optional[str] = None  # Present in ping events
+    zen: Optional[str] = None

@@ -16,12 +16,10 @@ from app.config import settings
 from app.models.github_repository import (
     GitHubRepository,
     GitHubRepositoryCreate,
-    CIFailure,
     CIFailureCreate,
-    RepositoryContext,
     GitHubWebhookPayload,
 )
-from app.models.ticket import TicketCreate, TicketStatus, TicketPriority
+from app.models.ticket import TicketCreate, TicketPriority
 from app.services.actor_service import ActorService
 from app.services.ai_automation_service import AIAutomationService
 from app.services.ticket_service import TicketService
@@ -81,6 +79,22 @@ class GitHubService:
         ).data
         return GitHubRepository(**result[0])
 
+    async def list_repositories(
+        self, team_id: Optional[UUID], supabase_client: AsyncClient
+    ) -> List[GitHubRepository]:
+        """List GitHub repositories, optionally filtered by team."""
+
+        query = (
+            supabase_client.table("github_repositories")
+            .select("*")
+            .eq("is_active", True)
+        )
+        if team_id:
+            query = query.eq("team_id", str(team_id))
+
+        repos = (await query.execute()).data
+        return [GitHubRepository(**repo) for repo in repos]
+
     async def get_repository_by_full_name(
         self, full_name: str, supabase_client: AsyncClient
     ) -> Optional[GitHubRepository]:
@@ -93,124 +107,6 @@ class GitHubService:
             .execute()
         ).data
         return GitHubRepository(**repo[0]) if repo else None
-
-    async def get_repository_context(self, full_name: str) -> Dict:
-        """Gather comprehensive repository context for AI analysis."""
-        try:
-            repo = self.github_client.get_repo(full_name)
-
-            # Get recent commits
-            commits = []
-            for commit in islice(repo.get_commits(), 20):
-                commits.append(
-                    {
-                        "sha": commit.sha,
-                        "message": commit.commit.message,
-                        "author": (
-                            commit.commit.author.name
-                            if commit.commit.author
-                            else "Unknown"
-                        ),
-                        "date": (
-                            commit.commit.author.date.isoformat()
-                            if commit.commit.author
-                            else None
-                        ),
-                        "files_changed": (
-                            [f.filename for f in commit.files] if commit.files else []
-                        ),
-                    }
-                )
-
-            # Get recent PRs
-            open_prs = []
-            for pr in islice(repo.get_pulls(state="all"), 20):
-                open_prs.append(
-                    {
-                        "number": pr.number,
-                        "title": pr.title,
-                        "user": pr.user.login if pr.user else "Unknown",
-                        "created_at": pr.created_at.isoformat(),
-                        "labels": [label.name for label in pr.labels],
-                    }
-                )
-
-            # Get recent issues
-            recent_issues = []
-            for issue in islice(repo.get_issues(state="all"), 20):
-                if not issue.pull_request:
-                    recent_issues.append(
-                        {
-                            "number": issue.number,
-                            "title": issue.title,
-                            "state": issue.state,
-                            "labels": [label.name for label in issue.labels],
-                            "created_at": issue.created_at.isoformat(),
-                            "body": (issue.body[:500] if issue.body else ""),
-                        }
-                    )
-
-            # Get repository languages
-            languages = repo.get_languages()
-
-            # Get key files structure
-            key_files = await self._get_key_files_structure(repo)
-
-            context = {
-                "repository": {
-                    "name": repo.full_name,
-                    "description": repo.description,
-                    "language": repo.language,
-                    "languages": languages,
-                    "stars": repo.stargazers_count,
-                    "forks": repo.forks_count,
-                },
-                "recent_commits": commits,
-                "open_prs": open_prs,
-                "recent_issues": recent_issues,
-                "file_structure": key_files,
-                "last_updated": datetime.now(timezone.utc).isoformat(),
-            }
-
-            return context
-
-        except GithubException as e:
-            logger.error(f"GitHub API error for {full_name}: {e}")
-            return {}
-        except Exception as e:
-            logger.error(f"Unexpected error getting context for {full_name}: {e}")
-            return {}
-
-    async def _get_key_files_structure(self, repo) -> List[Dict]:
-        """Get important files from repository"""
-        key_files = []
-        important_files = [
-            "README.md",
-            "package.json",
-            "requirements.txt",
-            "Dockerfile",
-            "docker-compose.yml",
-            ".github/workflows",
-            "src/",
-            "app/",
-            "lib/",
-        ]
-
-        try:
-            contents = repo.get_contents("")
-            for content in contents:
-                if any(important in content.path for important in important_files):
-                    key_files.append(
-                        {
-                            "path": content.path,
-                            "type": content.type,
-                            "size": content.size if hasattr(content, "size") else 0,
-                        }
-                    )
-        except Exception as e:
-            logger.warning(f"Could not get file structure: {e}")
-
-        return key_files
 
     async def handle_ci_failure_webhook(
         self, payload: GitHubWebhookPayload, supabase_client: AsyncClient
@@ -248,7 +144,7 @@ class GitHubService:
 
         # Create automated ticket
 
-        repo_context = await self.get_repository_context(full_name)
+        repo_context = await self._get_repository_context(full_name)
         ticket_description = self._format_ci_failure_description(
             ci_failure_data, repo_context, payload
         )
@@ -277,7 +173,6 @@ class GitHubService:
             {"ticket_id": str(ticket.id)}
         ).eq("id", ci_failure_id).execute()
 
-        # Autotag the ticket
         await TicketService.add_tags(
             ticket.id,
             [
@@ -301,10 +196,52 @@ class GitHubService:
                 logger.info(f"AI automation completed for ticket {ticket.id}")
 
         asyncio.create_task(
-            AIAutomationService.handle_ci_ticket_created(ticket.id)
+            AIAutomationService.post_ai_root_cause_analysis(ticket.id)
         ).add_done_callback(ai_automation_callback)
 
         return ticket.id
+
+    async def get_commit_context_for_rootcause(
+        self,
+        full_name: str,
+        failure_time: datetime,
+        failure_logs: str = "",
+        include_full_codebase: bool = False,
+    ) -> Dict:
+        """Get detailed commit context for root cause analysis"""
+        try:
+            commit_analysis = await self.analyze_recent_commits(full_name, failure_time)
+
+            repo_context = await self._get_repository_context(full_name)
+
+            correlation = self._correlate_logs_with_commits(
+                failure_logs, commit_analysis.get("commits", [])
+            )
+
+            full_codebase = None
+            if include_full_codebase:
+                full_codebase = await self._get_full_repository_code(full_name)
+
+            context = {
+                "repository": {
+                    "name": full_name,
+                    "language": repo_context.get("primary_language", "unknown"),
+                    "tech_stack": repo_context.get("tech_stack", []),
+                },
+                "commit_analysis": commit_analysis,
+                "log_correlation": correlation,
+                "risk_assessment": self._assess_overall_risk(commit_analysis),
+                "suggested_focus_areas": self._suggest_focus_areas(
+                    commit_analysis, correlation
+                ),
+                "full_codebase": full_codebase,
+            }
+
+            return context
+
+        except Exception as e:
+            logger.error(f"Error getting commit context for root cause: {str(e)}")
+            return {"error": str(e)}
 
     def _format_ci_failure_description(
         self,
@@ -345,6 +282,37 @@ class GitHubService:
             description += f"\n**GitHub Workflow:** N/A"
 
         return description
+
+    async def _get_key_files_structure(self, repo) -> List[Dict]:
+        """Get important files from repository"""
+        key_files = []
+        important_files = [
+            "README.md",
+            "package.json",
+            "requirements.txt",
+            "Dockerfile",
+            "docker-compose.yml",
+            ".github/workflows",
+            "src/",
+            "app/",
+            "lib/",
+        ]
+
+        try:
+            contents = repo.get_contents("")
+            for content in contents:
+                if any(important in content.path for important in important_files):
+                    key_files.append(
+                        {
+                            "path": content.path,
+                            "type": content.type,
+                            "size": content.size if hasattr(content, "size") else 0,
+                        }
+                    )
+        except Exception as e:
+            logger.warning(f"Could not get file structure: {e}")
+
+        return key_files
 
     async def _get_workflow_logs(self, full_name: str, run_id: int) -> str:
         """Get workflow logs from GitHub API."""
@@ -454,36 +422,16 @@ class GitHubService:
 
         return "Logs unavailable"
 
-    async def list_repositories(
-        self, team_id: Optional[UUID], supabase_client: AsyncClient
-    ) -> List[GitHubRepository]:
-        """List GitHub repositories, optionally filtered by team."""
-
-        query = (
-            supabase_client.table("github_repositories")
-            .select("*")
-            .eq("is_active", True)
-        )
-        if team_id:
-            query = query.eq("team_id", str(team_id))
-
-        repos = (await query.execute()).data
-        return [GitHubRepository(**repo) for repo in repos]
-
     async def analyze_recent_commits(
         self, full_name: str, failure_time: datetime, max_commits: int = 50
     ) -> Dict:
-        """
-        Analyze ALL commits in the repository (up to max_commits)
-        This provides complete contextual information for root cause analysis
-        """
+        """Analyze commits in the repository"""
         try:
             if not self.github_client:
                 return {"error": "GitHub client not available"}
 
             repo = self.github_client.get_repo(full_name)
 
-            # Get ALL commits (up to max_commits for performance)
             commits = list(repo.get_commits()[:max_commits])
 
             commit_analysis = {
@@ -495,9 +443,7 @@ class GitHubService:
                 "commit_patterns": self._analyze_commit_patterns(commits),
             }
 
-            for commit in commits[
-                :20
-            ]:  # Analyze first 20 commits for detailed analysis
+            for commit in commits:
                 commit_data = await self._analyze_single_commit(repo, commit)
                 commit_analysis["commits"].append(commit_data)
 
@@ -518,6 +464,92 @@ class GitHubService:
         except Exception as e:
             logger.error(f"Error analyzing recent commits: {str(e)}")
             return {"error": str(e)}
+
+    async def _get_repository_context(self, full_name: str) -> Dict:
+        try:
+            repo = self.github_client.get_repo(full_name)
+
+            # Get recent commits
+            commits = []
+            for commit in islice(repo.get_commits(), 20):
+                commits.append(
+                    {
+                        "sha": commit.sha,
+                        "message": commit.commit.message,
+                        "author": (
+                            commit.commit.author.name
+                            if commit.commit.author
+                            else "Unknown"
+                        ),
+                        "date": (
+                            commit.commit.author.date.isoformat()
+                            if commit.commit.author
+                            else None
+                        ),
+                        "files_changed": (
+                            [f.filename for f in commit.files] if commit.files else []
+                        ),
+                    }
+                )
+
+            # Get recent PRs
+            open_prs = []
+            for pr in islice(repo.get_pulls(state="all"), 20):
+                open_prs.append(
+                    {
+                        "number": pr.number,
+                        "title": pr.title,
+                        "user": pr.user.login if pr.user else "Unknown",
+                        "created_at": pr.created_at.isoformat(),
+                        "labels": [label.name for label in pr.labels],
+                    }
+                )
+
+            # Get recent issues
+            recent_issues = []
+            for issue in islice(repo.get_issues(state="all"), 20):
+                if not issue.pull_request:
+                    recent_issues.append(
+                        {
+                            "number": issue.number,
+                            "title": issue.title,
+                            "state": issue.state,
+                            "labels": [label.name for label in issue.labels],
+                            "created_at": issue.created_at.isoformat(),
+                            "body": (issue.body[:500] if issue.body else ""),
+                        }
+                    )
+
+            # Get repository languages
+            languages = repo.get_languages()
+
+            # Get key files structure
+            key_files = await self._get_key_files_structure(repo)
+
+            context = {
+                "repository": {
+                    "name": repo.full_name,
+                    "description": repo.description,
+                    "language": repo.language,
+                    "languages": languages,
+                    "stars": repo.stargazers_count,
+                    "forks": repo.forks_count,
+                },
+                "recent_commits": commits,
+                "open_prs": open_prs,
+                "recent_issues": recent_issues,
+                "file_structure": key_files,
+                "last_updated": datetime.now(timezone.utc).isoformat(),
+            }
+
+            return context
+
+        except GithubException as e:
+            logger.error(f"GitHub API error for {full_name}: {e}")
+            return {}
+        except Exception as e:
+            logger.error(f"Unexpected error getting context for {full_name}: {e}")
+            return {}
 
     async def _analyze_single_commit(self, repo, commit) -> Dict:
         """Analyze a single commit for potential issues"""
@@ -827,56 +859,6 @@ class GitHubService:
                 return True
 
         return False
-
-    async def get_commit_context_for_rootcause(
-        self,
-        full_name: str,
-        failure_time: datetime,
-        failure_logs: str = "",
-        include_full_codebase: bool = True,
-    ) -> Dict:
-        """
-        Get comprehensive commit context for enhanced root cause analysis
-        This is the main method called by the root cause service
-        """
-        try:
-            # Analyze ALL commits in repository
-            commit_analysis = await self.analyze_recent_commits(full_name, failure_time)
-
-            # Get repository context
-            repo_context = await self.get_repository_context(full_name)
-
-            # Correlate failure logs with code changes
-            correlation = self._correlate_logs_with_commits(
-                failure_logs, commit_analysis.get("commits", [])
-            )
-
-            # Get full codebase if requested (for dissertation with small repos)
-            full_codebase = None
-            if include_full_codebase:
-                full_codebase = await self._get_full_repository_code(full_name)
-
-            # Build comprehensive context
-            context = {
-                "repository": {
-                    "name": full_name,
-                    "language": repo_context.get("primary_language", "unknown"),
-                    "tech_stack": repo_context.get("tech_stack", []),
-                },
-                "commit_analysis": commit_analysis,
-                "log_correlation": correlation,
-                "risk_assessment": self._assess_overall_risk(commit_analysis),
-                "suggested_focus_areas": self._suggest_focus_areas(
-                    commit_analysis, correlation
-                ),
-                "full_codebase": full_codebase,
-            }
-
-            return context
-
-        except Exception as e:
-            logger.error(f"Error getting commit context for root cause: {str(e)}")
-            return {"error": str(e)}
 
     def _correlate_logs_with_commits(self, logs: str, commits: List[Dict]) -> Dict:
         """Correlate failure logs with recent commits to find likely causes"""

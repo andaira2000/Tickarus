@@ -3,6 +3,7 @@ import time
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 
+import asyncio
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -31,6 +32,18 @@ class SimilarityService:
         embedding = self.model.encode([text])[0]
         self._embeddings_cache[text_hash] = embedding
         return embedding
+
+    async def precompute_embeddings_for_existing_tickets(self):
+        supabase_client = get_service_client()
+        tickets = (
+            await supabase_client.table("tickets")
+            .select("id, title, description")
+            .execute()
+        ).data
+
+        for ticket in tickets:
+            ticket_text = self._get_ticket_text(ticket)
+            self._compute_embedding(ticket_text)
 
     async def find_similar_tickets(
         self,
@@ -119,21 +132,6 @@ class SimilarityService:
         except Exception as e:
             logger.error(f"Error in similarity detection: {str(e)}")
             return []
-
-    async def log_similarity_click(
-        self,
-        clicked_ticket_id: UUID,
-        original_ticket_id: Optional[UUID] = None,
-        user_id: Optional[UUID] = None,
-    ):
-        """Log when user clicks on a similarity suggestion"""
-        await MetricsService.log_event(
-            event_type="similarity_clicked",
-            ticket_id=original_ticket_id,
-            user_id=user_id,
-            ai_feature="similarity",
-            metadata={"clicked_ticket": str(clicked_ticket_id)},
-        )
 
 
 similarity_service = SimilarityService()

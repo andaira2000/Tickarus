@@ -1,25 +1,34 @@
+import logging
 import time
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 from uuid import UUID
-import logging
+
+from supabase import AsyncClient
+
 from app.db.database import get_service_client
 from app.services.metrics_service import MetricsService
 from app.services.llm_interface import get_llm_service, LLMMessage
-from app.services.similarity_service import SimilarityService
-from app.services.github_service import github_service
+from app.services.similarity_service import similarity_service
 
 logger = logging.getLogger(__name__)
 
 
 class RootCauseService:
-    """
-    Root cause analysis using pattern matching and heuristics
-    For dissertation: measures accuracy of root cause suggestions
-    """
+    @property
+    def github_service(self):
+        # Avoid circular import
+        if self._github_service is None:
+            from app.services.github_service import github_service
+
+            self._github_service = github_service
+
+        return self._github_service
 
     def __init__(self):
-        self.similarity_service = SimilarityService()
-        self.analysis_patterns = [
+        self._github_service = None
+
+        self._analysis_patterns = [
             {
                 "pattern": ["timeout", "connection", "database", "db"],
                 "root_cause": "Database connectivity issues",
@@ -137,7 +146,7 @@ class RootCauseService:
         best_match = None
         best_score = 0
 
-        for pattern_def in self.analysis_patterns:
+        for pattern_def in self._analysis_patterns:
             pattern_keywords = pattern_def["pattern"]
             matches = sum(
                 1
@@ -152,20 +161,17 @@ class RootCauseService:
         return best_match if best_score > 0 else None
 
     async def _get_similar_resolved_tickets(
-        self, ticket_text: str, ticket_id: UUID, limit: int = 3, client=None
+        self, ticket_text: str, ticket_id: UUID, limit: int = 3
     ) -> List[Dict[str, Any]]:
-        """Find similar resolved tickets using BERT embeddings"""
+        """Find similar resolved tickets."""
         try:
-            # Use similarity service to find semantically similar tickets
-            similar_tickets = await self.similarity_service.find_similar_tickets(
+            # Get more than needed and filter down to resolved
+            similar_tickets = await similarity_service.find_similar_tickets(
                 ticket_text=ticket_text,
                 current_ticket_id=ticket_id,
-                limit=limit * 3,  # Get more to filter for resolved ones
-                user_id=None,  # System operation
-                client=client,
+                limit=limit * 3,
             )
 
-            # Filter for only resolved/closed tickets
             resolved_tickets = [
                 ticket
                 for ticket in similar_tickets
@@ -178,40 +184,39 @@ class RootCauseService:
             logger.error(f"Error finding similar resolved tickets: {str(e)}")
             return []
 
-    async def _get_commit_context_if_applicable(self, ticket: Dict, client) -> Dict:
+    async def _get_commit_context_if_applicable(
+        self, ticket: Dict, supabase_client: AsyncClient
+    ) -> Dict:
         """Get commit context if this ticket is related to a CI failure"""
         try:
             # Check if this ticket is linked to a CI failure
-            ci_failure_resp = exec_query(
-                client.table("ci_failures")
+            ci_failure_result = (
+                await supabase_client.table("ci_failures")
                 .select("*, github_repositories(full_name)")
                 .eq("ticket_id", ticket["id"])
                 .limit(1)
+                .execute()
             )
 
-            # Check if any CI failure records exist
-            if not ci_failure_resp.data or len(ci_failure_resp.data) == 0:
+            if not ci_failure_result.data or len(ci_failure_result.data) == 0:
                 return {"available": False}
 
-            ci_failure = ci_failure_resp.data[0]
+            ci_failure = ci_failure_result.data[0]
             repo_full_name = ci_failure.get("github_repositories", {}).get("full_name")
             failure_time = ci_failure.get("created_at")
 
             if not repo_full_name or not failure_time:
                 return {"available": False}
 
-            # Parse failure time
-            from datetime import datetime
-
             failure_datetime = datetime.fromisoformat(
                 failure_time.replace("Z", "+00:00")
             )
 
-            # Get comprehensive commit context
-            commit_context = await github_service.get_commit_context_for_rootcause(
+            commit_context = await self.github_service.get_commit_context_for_rootcause(
                 full_name=repo_full_name,
                 failure_time=failure_datetime,
                 failure_logs=ci_failure.get("logs", ""),
+                include_full_codebase=True,
             )
 
             logger.info(
@@ -242,49 +247,40 @@ class RootCauseService:
         ticket_id: UUID,
         user_id: Optional[UUID] = None,
         use_llm: bool = True,
-        client=None,
     ) -> Dict[str, Any]:
-        """
-        Perform root cause analysis on a ticket using AI
-        """
-        start_time = time.time()
-
+        """Perform root cause analysis on a ticket using AI"""
         try:
-            # Get ticket details
-            c = client or self._c()
-            ticket_resp = exec_query(
-                c.table("tickets")
+            start_time = time.time()
+
+            supabase_client = get_service_client()
+
+            ticket = (
+                await supabase_client.table("tickets")
                 .select("id, title, description, status, teams(name)")
                 .eq("id", str(ticket_id))
                 .single()
-            )
+                .execute()
+            ).data
 
-            if not ticket_resp.data:
-                raise Exception("Ticket not found")
-
-            ticket = ticket_resp.data
-
-            # Get recent comments for additional context
-            comments_resp = exec_query(
-                c.table("comments")
+            recent_comments = (
+                await supabase_client.table("comments")
                 .select("content, created_at")
                 .eq("ticket_id", str(ticket_id))
                 .order("created_at", desc=True)
                 .limit(3)
-            )
-            recent_comments = comments_resp.data or []
+                .execute()
+            ).data
 
-            # Extract keywords from title and description
             text_content = f"{ticket['title']} {ticket.get('description', '')}"
             keywords = self._extract_keywords(text_content)
 
-            # Get similar resolved tickets using BERT embeddings
             similar_tickets = await self._get_similar_resolved_tickets(
-                ticket_text=text_content, ticket_id=ticket_id, client=c
+                ticket_text=text_content, ticket_id=ticket_id
             )
 
-            # Get commit context for enhanced analysis (if this is a CI-created ticket)
-            commit_context = await self._get_commit_context_if_applicable(ticket, c)
+            commit_context = await self._get_commit_context_if_applicable(
+                ticket, supabase_client
+            )
 
             analysis = None
             pattern_match = None
@@ -363,14 +359,12 @@ class RootCauseService:
                     "similar_tickets_found": len(similar_tickets),
                 },
                 response_time_ms=response_time,
-                client=c,
             )
 
             return final_analysis
 
         except Exception as e:
             logger.error(f"Error in root cause analysis: {str(e)}")
-            # Still log the attempt for metrics
             response_time = int((time.time() - start_time) * 1000)
             await MetricsService.log_event(
                 event_type="rootcause_error",
@@ -379,7 +373,6 @@ class RootCauseService:
                 ai_feature="rootcause",
                 metadata={"error": str(e)},
                 response_time_ms=response_time,
-                client=client or get_service_client(),
             )
             raise
 
@@ -388,7 +381,7 @@ class RootCauseService:
         ticket: Dict[str, Any],
         recent_comments: List[Dict[str, Any]],
         similar_tickets: List[Dict[str, Any]],
-        commit_context: Dict[str, Any] = None,
+        commit_context: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Use LLM to analyze ticket and provide root cause analysis"""
 
@@ -554,7 +547,7 @@ class RootCauseService:
             system_prompt = """You are a senior software engineer specializing in debugging and root cause analysis. You have access to comprehensive code analysis including recent commits, file changes, CI failure logs, and the COMPLETE REPOSITORY CODEBASE.
 
 Analyze the provided information and provide:
-1. A concise root cause analysis (1-2 sentences) leveraging commit history, code changes, and actual source code
+1. A detailed root cause analysis leveraging commit history, code changes, and actual source code
 2. A confidence score from 0.1 to 1.0 (higher confidence when you can see the exact code causing issues)
 3. 3-5 specific, actionable troubleshooting steps based on the actual codebase
 
@@ -567,20 +560,10 @@ IMPORTANT INSTRUCTIONS:
 - Use the commit changes in context of the full codebase to understand impact
 - Reference specific files, functions, and code patterns you can see
 - Consider CI/CD configuration files, dependencies, and build processes
+- Make sure to mention commits that are likely causing the issue if you can identify them
 
 Since you can see the entire codebase, you should be able to provide highly specific and accurate root cause analysis.
-
-Respond in JSON format:
-{
-  "root_cause": "Specific description of the exact code issue/bug with file references",
-  "confidence_score": 0.95,
-  "suggestions": [
-    "Fix specific line/function in specific file",
-    "Check specific configuration in specific file",
-    "Investigate specific dependency/import issue",
-    "Update specific test or CI configuration"
-  ]
-}"""
+"""
         else:
             system_prompt = """You are a senior software engineer specializing in debugging and root cause analysis.
 
@@ -590,22 +573,28 @@ Analyze the provided ticket information and provide:
 3. 3-5 specific, actionable troubleshooting steps
 
 Focus on the most likely technical causes based on the symptoms described. Be practical and specific in your recommendations.
+"""
 
-Respond in JSON format:
-{
-  "root_cause": "Brief description of the likely root cause",
-  "confidence_score": 0.85,
+        user_prompt = f"""
+Please analyze this ticket:
+
+{ticket_context}
+
+Give me a JSON object with the following format:
+{{
+  "root_cause": "Specific description of the exact code issue and root cause",
+  "confidence_score": 0.95,
   "suggestions": [
     "Specific action item 1",
     "Specific action item 2",
-    "Specific action item 3"
+    "Specific action item 3",
+    "Specific action item 4"
   ]
-}"""
+}}
 
-        user_prompt = f"Please analyze this ticket:\n\n{ticket_context}"
-        logger.info(f"{user_prompt=}, {system_prompt=}")
+You must output only a single JSON object. No prose, no code fences, no backticks, no explanations! I need to be able to parse your response programmatically.
+"""
 
-        # Get LLM service and generate response
         llm_service = get_llm_service()
         messages = [
             LLMMessage("system", system_prompt),
@@ -622,6 +611,7 @@ Respond in JSON format:
         try:
             import json
 
+            logger.info(f"LLM response: {response.content}")
             analysis_data = json.loads(response.content.strip())
 
             # Validate response structure
@@ -661,23 +651,6 @@ Respond in JSON format:
                 "analysis_method": "llm_unparsed",
                 "token_usage": response.usage.get("total_tokens", 0),
             }
-
-    async def submit_feedback(
-        self,
-        ticket_id: UUID,
-        user_id: UUID,
-        rating: int,
-        feedback_text: Optional[str] = None,
-    ):
-        """Submit user feedback on root cause analysis quality"""
-        await MetricsService.log_event(
-            event_type="rootcause_feedback",
-            ticket_id=ticket_id,
-            user_id=user_id,
-            ai_feature="rootcause",
-            user_rating=rating,
-            metadata={"feedback_text": feedback_text} if feedback_text else None,
-        )
 
     def _summarize_commit_context(self, commit_context: Dict) -> Dict:
         """Summarize commit context for metadata"""

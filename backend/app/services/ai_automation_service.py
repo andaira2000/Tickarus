@@ -9,20 +9,12 @@ from app.services.comment_service import CommentService
 
 logger = logging.getLogger(__name__)
 
-CI_AUTOMATION_BOT_UUID = "00000000-0000-4000-8000-000000000001"
 AI_ASSISTANT_BOT_UUID = "00000000-0000-4000-8000-000000000002"
 
 
 class AIAutomationService:
-
     @staticmethod
-    async def handle_ci_ticket_created(ticket_id: UUID):
-        """Post AI analysis comment for CI tickets."""
-        logger.info(f"Triggering AI analysis for CI ticket {ticket_id}")
-        await AIAutomationService._post_ai_root_cause_analysis(ticket_id)
-
-    @staticmethod
-    async def _post_ai_root_cause_analysis(ticket_id: UUID):
+    async def post_ai_root_cause_analysis(ticket_id: UUID):
         """Post AI root cause analysis as a comment on the ticket"""
         supabase_client = get_service_client()
 

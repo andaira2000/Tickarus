@@ -33,7 +33,7 @@ export function SimilaritySuggestions({ title, description, className }: Similar
   useEffect(() => {
     const timer = setTimeout(() => {
       const combinedText = `${title} ${description}`.trim();
-      if (combinedText.length > 10) { // Only search if we have meaningful content
+      if (combinedText.length > 1) { // Only search if we have meaningful content
         setDebouncedText(combinedText);
       } else {
         setDebouncedText('');

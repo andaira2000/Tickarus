@@ -8,7 +8,7 @@ from app.logging import configure_logging
 from app.api.routes import (
     # ai_chat,
     auth,
-    # comments,
+    comments,
     # evaluation,
     github,
     # metrics,
@@ -17,6 +17,7 @@ from app.api.routes import (
     tickets,
 )
 from app.db.database import init_supabase_service_client
+from app.services.similarity_service import similarity_service
 from app.services.llm_interface import (
     initialize_llm_service,
     LLMProvider,
@@ -33,6 +34,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_supabase_service_client()
+    await similarity_service.precompute_embeddings_for_existing_tickets()
 
     provider: LLMProvider
     try:
@@ -89,7 +91,7 @@ async def health_check():
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 # app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 app.include_router(tickets.router, prefix="/api/tickets", tags=["tickets"])
-# app.include_router(comments.router, prefix="/api/comments", tags=["comments"])
+app.include_router(comments.router, prefix="/api/comments", tags=["comments"])
 app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
 app.include_router(github.router, prefix="/api", tags=["github"])
 # app.include_router(metrics.router, prefix="/api/metrics", tags=["metrics"])

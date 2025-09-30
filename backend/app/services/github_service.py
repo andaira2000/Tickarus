@@ -8,8 +8,8 @@ from typing import Dict, List, Optional
 from uuid import UUID
 
 import httpx
-from github import Github
-from github.GithubException import GithubException
+from githubkit import GitHub
+from githubkit.exception import GitHubException, RequestFailed
 from supabase import AsyncClient
 
 from app.config import settings
@@ -43,7 +43,7 @@ async def _get_ci_bot_actor(supabase_client: AsyncClient):
 class GitHubService:
     def __init__(self):
         self.github_token = settings.github_token
-        self.github_client = Github(self.github_token)
+        self.github_client = GitHub(auth=self.github_token)
         self.org_name = settings.github_org_name
         self.webhook_secret = settings.github_webhook_secret
 
@@ -284,7 +284,7 @@ class GitHubService:
 
         return description
 
-    async def _get_key_files_structure(self, repo) -> List[Dict]:
+    async def _get_key_files_structure(self, owner: str, repo_name: str) -> List[Dict]:
         key_files = []
         important_files = [
             "README.md",
@@ -299,8 +299,10 @@ class GitHubService:
         ]
 
         try:
-            contents = repo.get_contents("")
-            for content in contents:
+            contents_resp = await self.github_client.rest.repos.async_get_content(
+                owner=owner, repo=repo_name, path=""
+            )
+            for content in contents_resp.parsed_data:
                 if any(important in content.path for important in important_files):
                     key_files.append(
                         {
@@ -425,12 +427,11 @@ class GitHubService:
         self, full_name: str, failure_time: datetime, max_commits: int = 50
     ) -> Dict:
         try:
-            if not self.github_client:
-                return {"error": "GitHub client not available"}
-
-            repo = self.github_client.get_repo(full_name)
-
-            commits = list(repo.get_commits())[:max_commits]
+            owner, repo_name = full_name.split("/")
+            commits_resp = await self.github_client.rest.repos.async_list_commits(
+                owner=owner, repo=repo_name, per_page=max_commits
+            )
+            commits = commits_resp.parsed_data
 
             commit_analysis = {
                 "total_commits": len(commits),
@@ -442,7 +443,9 @@ class GitHubService:
             }
 
             for commit in commits:
-                commit_data = await self._analyze_single_commit(commit)
+                commit_data = await self._analyze_single_commit(
+                    owner, repo_name, commit
+                )
                 commit_analysis["commits"].append(commit_data)
 
                 for file_info in commit_data.get("files", []):
@@ -454,6 +457,7 @@ class GitHubService:
                 risk_indicators = self._identify_commit_risks(commit_data)
                 commit_analysis["risk_indicators"].extend(risk_indicators)
 
+            logger.info(f"Commit analysis: {commit_analysis}")
             return commit_analysis
 
         except Exception as e:
@@ -462,10 +466,17 @@ class GitHubService:
 
     async def _get_repository_context(self, full_name: str) -> Dict:
         try:
-            repo = self.github_client.get_repo(full_name)
+            owner, repo_name = full_name.split("/")
+            repo_resp = await self.github_client.rest.repos.async_get(
+                owner=owner, repo=repo_name
+            )
+            repo = repo_resp.parsed_data
 
+            commits_resp = await self.github_client.rest.repos.async_list_commits(
+                owner=owner, repo=repo_name, per_page=20
+            )
             commits = []
-            for commit in islice(repo.get_commits(), 20):
+            for commit in commits_resp.parsed_data:
                 commits.append(
                     {
                         "sha": commit.sha,
@@ -480,14 +491,15 @@ class GitHubService:
                             if commit.commit.author
                             else None
                         ),
-                        "files_changed": (
-                            [f.filename for f in commit.files] if commit.files else []
-                        ),
+                        "files_changed": [],
                     }
                 )
 
+            prs_resp = await self.github_client.rest.pulls.async_list(
+                owner=owner, repo=repo_name, state="all", per_page=20
+            )
             open_prs = []
-            for pr in islice(repo.get_pulls(state="all"), 20):
+            for pr in prs_resp.parsed_data:
                 open_prs.append(
                     {
                         "number": pr.number,
@@ -498,8 +510,11 @@ class GitHubService:
                     }
                 )
 
+            issues_resp = await self.github_client.rest.issues.async_list_for_repo(
+                owner=owner, repo=repo_name, state="all", per_page=20
+            )
             recent_issues = []
-            for issue in islice(repo.get_issues(state="all"), 20):
+            for issue in issues_resp.parsed_data:
                 if not issue.pull_request:
                     recent_issues.append(
                         {
@@ -512,9 +527,12 @@ class GitHubService:
                         }
                     )
 
-            languages = repo.get_languages()
+            languages_resp = await self.github_client.rest.repos.async_list_languages(
+                owner=owner, repo=repo_name
+            )
+            languages = languages_resp.parsed_data
 
-            key_files = await self._get_key_files_structure(repo)
+            key_files = await self._get_key_files_structure(owner, repo_name)
 
             context = {
                 "repository": {
@@ -534,14 +552,14 @@ class GitHubService:
 
             return context
 
-        except GithubException as e:
+        except GitHubException as e:
             logger.error(f"GitHub API error for {full_name}: {e}")
             return {}
         except Exception as e:
             logger.error(f"Unexpected error getting context for {full_name}: {e}")
             return {}
 
-    async def _analyze_single_commit(self, commit) -> Dict:
+    async def _analyze_single_commit(self, owner: str, repo_name: str, commit) -> Dict:
         try:
             commit_data = {
                 "sha": commit.sha[:8],
@@ -550,24 +568,50 @@ class GitHubService:
                 "date": commit.commit.author.date.isoformat(),
                 "files": [],
                 "stats": {
-                    "additions": commit.stats.additions,
-                    "deletions": commit.stats.deletions,
-                    "total": commit.stats.total,
+                    "additions": (
+                        getattr(commit.stats, "additions", 0)
+                        if hasattr(commit, "stats")
+                        else 0
+                    ),
+                    "deletions": (
+                        getattr(commit.stats, "deletions", 0)
+                        if hasattr(commit, "stats")
+                        else 0
+                    ),
+                    "total": (
+                        getattr(commit.stats, "total", 0)
+                        if hasattr(commit, "stats")
+                        else 0
+                    ),
                 },
             }
 
-            for file in commit.files:
-                file_info = {
-                    "filename": file.filename,
-                    "status": file.status,
-                    "additions": file.additions,
-                    "deletions": file.deletions,
-                    "changes": file.changes,
-                    "patch": (file.patch[:1000] if file.patch else None),
-                }
+            try:
+                commit_detail_resp = (
+                    await self.github_client.rest.repos.async_get_commit(
+                        owner=owner, repo=repo_name, ref=commit.sha
+                    )
+                )
+                commit_detail = commit_detail_resp.parsed_data
 
-                file_info.update(self._analyze_file_changes(file))
-                commit_data["files"].append(file_info)
+                for file in commit_detail.files or []:
+                    file_info = {
+                        "filename": getattr(file, "filename", ""),
+                        "status": getattr(file, "status", ""),
+                        "additions": getattr(file, "additions", 0),
+                        "deletions": getattr(file, "deletions", 0),
+                        "changes": getattr(file, "changes", 0),
+                        "patch": (
+                            file.patch[:1000]
+                            if hasattr(file, "patch") and file.patch
+                            else None
+                        ),
+                    }
+
+                    file_info.update(self._analyze_file_changes(file))
+                    commit_data["files"].append(file_info)
+            except Exception:
+                pass
 
             return commit_data
 
@@ -949,14 +993,18 @@ class GitHubService:
         self, full_name: str, max_file_size: int = 50000
     ) -> Dict:
         try:
-            if not self.github_client:
-                return {"error": "GitHub client not available"}
-
-            repo = self.github_client.get_repo(full_name)
+            owner, repo_name = full_name.split("/")
+            repo_resp = await self.github_client.rest.repos.async_get(
+                owner=owner, repo=repo_name
+            )
+            repo = repo_resp.parsed_data
 
             default_branch = repo.default_branch
 
-            tree = repo.get_git_tree(default_branch, recursive=True)
+            tree_resp = await self.github_client.rest.git.async_get_tree(
+                owner=owner, repo=repo_name, tree_sha=default_branch, recursive=True
+            )
+            tree = tree_resp.parsed_data
 
             codebase = {
                 "repository": full_name,
@@ -1046,10 +1094,17 @@ class GitHubService:
                     continue
 
                 try:
-                    file_content = repo.get_contents(file_info["path"])
+                    content_resp = (
+                        await self.github_client.rest.repos.async_get_content(
+                            owner=owner, repo=repo_name, path=file_info["path"]
+                        )
+                    )
+                    file_content = content_resp.parsed_data
 
-                    if file_content.content:
-                        decoded_content = file_content.decoded_content.decode(
+                    if hasattr(file_content, "content") and file_content.content:
+                        import base64
+
+                        decoded_content = base64.b64decode(file_content.content).decode(
                             "utf-8", errors="ignore"
                         )
 

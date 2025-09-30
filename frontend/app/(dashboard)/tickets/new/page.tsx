@@ -92,8 +92,8 @@ function CreateTicketContent() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="lg:col-span-1">
           <Card>
             <CardHeader>
               <CardTitle>Ticket Information</CardTitle>
@@ -200,6 +200,15 @@ function CreateTicketContent() {
                 />
               </div>
 
+              <AutoTaggingSuggestions
+                title={form.watch('title') || ''}
+                description={form.watch('description') || ''}
+                selectedTags={selectedTags}
+                selectedPriority={form.watch('priority') as TicketPriority}
+                onTagsSelected={setSelectedTags}
+                onPrioritySelected={(priority) => form.setValue('priority', priority)}
+              />
+
               {/* Selected Tags Display */}
               {selectedTags.length > 0 && (
                 <div>
@@ -245,19 +254,10 @@ function CreateTicketContent() {
           </Card>
         </div>
 
-        <div className="space-y-6">
+        <div>
           <SimilaritySuggestions
             title={form.watch('title') || ''}
             description={form.watch('description') || ''}
-          />
-
-          <AutoTaggingSuggestions
-            title={form.watch('title') || ''}
-            description={form.watch('description') || ''}
-            selectedTags={selectedTags}
-            selectedPriority={form.watch('priority') as TicketPriority}
-            onTagsSelected={setSelectedTags}
-            onPrioritySelected={(priority) => form.setValue('priority', priority)}
           />
         </div>
       </div>

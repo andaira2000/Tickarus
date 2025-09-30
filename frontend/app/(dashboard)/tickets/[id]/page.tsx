@@ -39,6 +39,7 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ['ticket', ticketId],
@@ -246,8 +247,26 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
               <CardTitle>Description</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="whitespace-pre-wrap text-sm text-muted-foreground">
-                {ticket.description}
+              <div className="relative">
+                <div
+                  className={`whitespace-pre-wrap text-sm text-muted-foreground transition-all ${
+                    !isDescriptionExpanded && ticket.description.length > 300
+                      ? 'line-clamp-3'
+                      : ''
+                  }`}
+                >
+                  {ticket.description}
+                </div>
+                {ticket.description.length > 300 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                    className="mt-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                  >
+                    {isDescriptionExpanded ? 'Show less' : 'Show more'}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

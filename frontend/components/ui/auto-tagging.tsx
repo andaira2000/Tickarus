@@ -106,66 +106,54 @@ export function AutoTaggingSuggestions({
 
   if (debouncedText.length === 0) {
     return (
-      <Card className={`shadow-md ${className}`}>
-        <CardContent className="p-6">
-          <div className="bg-purple-50 p-4 rounded-lg">
-            <h4 className="flex items-center gap-2 mb-3">
-              <Sparkles className="w-4 h-4 text-purple-600" />
-              AI Auto-Tagging
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              Start typing a title and description to get AI-powered tag and priority suggestions...
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className={`bg-purple-50 p-6 rounded-lg shadow-md ${className}`}>
+        <h4 className="flex items-center gap-2 mb-3">
+          <Sparkles className="w-4 h-4 text-purple-600" />
+          AI Auto-Tagging
+        </h4>
+        <p className="text-sm text-muted-foreground">
+          Start typing a title and description to get AI-powered tag and priority suggestions...
+        </p>
+      </div>
     );
   }
 
   if (isLoading) {
     return (
-      <Card className={`shadow-md ${className}`}>
-        <CardContent className="p-6">
-          <div className="bg-purple-50 p-4 rounded-lg">
-            <h4 className="flex items-center gap-2 mb-3">
-              <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
-              Analyzing Content...
-            </h4>
-            <div className="space-y-3">
-              <div>
-                <Skeleton className="h-4 w-24 mb-2" />
-                <div className="flex space-x-2">
-                  <Skeleton className="h-6 w-16" />
-                  <Skeleton className="h-6 w-20" />
-                  <Skeleton className="h-6 w-18" />
-                </div>
-              </div>
-              <div>
-                <Skeleton className="h-4 w-20 mb-2" />
-                <Skeleton className="h-6 w-24" />
-              </div>
+      <div className={`bg-purple-50 p-6 rounded-lg shadow-md ${className}`}>
+        <h4 className="flex items-center gap-2 mb-3">
+          <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+          Analyzing Content...
+        </h4>
+        <div className="space-y-3">
+          <div>
+            <Skeleton className="h-4 w-24 mb-2" />
+            <div className="flex space-x-2">
+              <Skeleton className="h-6 w-16" />
+              <Skeleton className="h-6 w-20" />
+              <Skeleton className="h-6 w-18" />
             </div>
           </div>
-        </CardContent>
-      </Card>
+          <div>
+            <Skeleton className="h-4 w-20 mb-2" />
+            <Skeleton className="h-6 w-24" />
+          </div>
+        </div>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Card className={`shadow-md ${className}`}>
-        <CardContent className="p-6">
-          <div className="bg-red-50 p-4 rounded-lg">
-            <h4 className="flex items-center gap-2 mb-3">
-              <Sparkles className="w-4 h-4 text-red-600" />
-              Auto-Tagging Error
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              Unable to generate suggestions. Please try again later.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className={`bg-red-50 p-6 rounded-lg shadow-md ${className}`}>
+        <h4 className="flex items-center gap-2 mb-3">
+          <Sparkles className="w-4 h-4 text-red-600" />
+          Auto-Tagging Error
+        </h4>
+        <p className="text-sm text-muted-foreground">
+          Unable to generate suggestions. Please try again later.
+        </p>
+      </div>
     );
   }
 
@@ -180,128 +168,124 @@ export function AutoTaggingSuggestions({
     : 0;
 
   return (
-    <Card className={`shadow-md ${className}`}>
-      <CardContent className="p-6">
-        <div className="bg-purple-50 p-4 rounded-lg space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-purple-600" />
-              AI Suggestions
-            </h4>
-            {averageConfidence > 0 && (
-              <span className={`text-xs ${getConfidenceColor(averageConfidence)}`}>
-                {getConfidenceLabel(averageConfidence)}
+    <div className={`bg-purple-50 p-6 rounded-lg shadow-md space-y-4 ${className}`}>
+      <div className="flex items-center justify-between">
+        <h4 className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-purple-600" />
+          AI Suggestions
+        </h4>
+        {averageConfidence > 0 && (
+          <span className={`text-xs ${getConfidenceColor(averageConfidence)}`}>
+            {getConfidenceLabel(averageConfidence)}
+          </span>
+        )}
+      </div>
+      {hasTagSuggestions && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-muted-foreground flex items-center">
+              <Tag className="w-3 h-3 mr-1" />
+              Suggested Tags
+            </label>
+            {onTagsSelected && !appliedSuggestions && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleApplyTags}
+                className="text-xs h-6 px-2"
+              >
+                Apply
+              </Button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {suggestions.suggested_tags.map((tag) => {
+              const isSelected = selectedTags.includes(tag);
+              const confidence = suggestions.confidence_scores?.[tag] || 0;
+              return (
+                <Badge
+                  key={tag}
+                  variant={isSelected ? "default" : "outline"}
+                  className="text-xs cursor-pointer hover:bg-gray-100"
+                  onClick={() => {
+                    if (onTagsSelected) {
+                      const newTags = isSelected
+                        ? selectedTags.filter(t => t !== tag)
+                        : [...selectedTags, tag];
+                      onTagsSelected(newTags);
+                    }
+                  }}
+                >
+                  {tag}
+                  {confidence > 0 && (
+                    <span className={`ml-1 ${getConfidenceColor(confidence)}`}>
+                      ({Math.round(confidence)}%)
+                    </span>
+                  )}
+                </Badge>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {hasPrioritySuggestion && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-muted-foreground flex items-center">
+              <Zap className="w-3 h-3 mr-1" />
+              Suggested Priority
+            </label>
+            {onPrioritySelected && !appliedSuggestions && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleApplyPriority}
+                className="text-xs h-6 px-2"
+              >
+                Apply
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
+            if (onPrioritySelected) {
+              onPrioritySelected(suggestions.suggested_priority as TicketPriority);
+            }
+          }}>
+            <div className={`w-3 h-3 rounded-full ${getPriorityColor(suggestions.suggested_priority)}`}></div>
+            <span className="text-sm capitalize">{formatPriority(suggestions.suggested_priority)}</span>
+            {suggestions.confidence_scores?.[`priority_${suggestions.suggested_priority}`] && (
+              <span className={`text-xs ${getConfidenceColor(suggestions.confidence_scores[`priority_${suggestions.suggested_priority}`])}`}>
+                ({Math.round(suggestions.confidence_scores[`priority_${suggestions.suggested_priority}`])}%)
               </span>
             )}
           </div>
-        {hasTagSuggestions && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-muted-foreground flex items-center">
-                <Tag className="w-3 h-3 mr-1" />
-                Suggested Tags
-              </label>
-              {onTagsSelected && !appliedSuggestions && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleApplyTags}
-                  className="text-xs h-6 px-2"
-                >
-                  Apply
-                </Button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {suggestions.suggested_tags.map((tag) => {
-                const isSelected = selectedTags.includes(tag);
-                const confidence = suggestions.confidence_scores?.[tag] || 0;
-                return (
-                  <Badge
-                    key={tag}
-                    variant={isSelected ? "default" : "outline"}
-                    className="text-xs cursor-pointer hover:bg-gray-100"
-                    onClick={() => {
-                      if (onTagsSelected) {
-                        const newTags = isSelected
-                          ? selectedTags.filter(t => t !== tag)
-                          : [...selectedTags, tag];
-                        onTagsSelected(newTags);
-                      }
-                    }}
-                  >
-                    {tag}
-                    {confidence > 0 && (
-                      <span className={`ml-1 ${getConfidenceColor(confidence)}`}>
-                        ({Math.round(confidence)}%)
-                      </span>
-                    )}
-                  </Badge>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {hasPrioritySuggestion && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-muted-foreground flex items-center">
-                <Zap className="w-3 h-3 mr-1" />
-                Suggested Priority
-              </label>
-              {onPrioritySelected && !appliedSuggestions && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleApplyPriority}
-                  className="text-xs h-6 px-2"
-                >
-                  Apply
-                </Button>
-              )}
-            </div>
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
-              if (onPrioritySelected) {
-                onPrioritySelected(suggestions.suggested_priority as TicketPriority);
-              }
-            }}>
-              <div className={`w-3 h-3 rounded-full ${getPriorityColor(suggestions.suggested_priority)}`}></div>
-              <span className="text-sm capitalize">{formatPriority(suggestions.suggested_priority)}</span>
-              {suggestions.confidence_scores?.[`priority_${suggestions.suggested_priority}`] && (
-                <span className={`text-xs ${getConfidenceColor(suggestions.confidence_scores[`priority_${suggestions.suggested_priority}`])}`}>
-                  ({Math.round(suggestions.confidence_scores[`priority_${suggestions.suggested_priority}`])}%)
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-          {(hasTagSuggestions || hasPrioritySuggestion) && !appliedSuggestions && (
-            <div className="pt-2 border-t border-purple-200">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleApplyAll}
-                className="w-full text-xs bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white border-0"
-              >
-                <Sparkles className="w-3 h-3 mr-1" />
-                Apply All Suggestions
-              </Button>
-            </div>
-          )}
-
-          {appliedSuggestions && (
-            <div className="text-xs text-green-600 text-center py-2 bg-green-50 rounded">
-              ✓ AI suggestions applied! You can still modify tags and priority manually.
-            </div>
-          )}
-
-          <div className="text-xs text-muted-foreground pt-2 border-t border-purple-200">
-            💡 These suggestions are based on similar tickets and common patterns.
-          </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      {(hasTagSuggestions || hasPrioritySuggestion) && !appliedSuggestions && (
+        <div className="pt-2 border-t border-purple-200">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleApplyAll}
+            className="w-full text-xs bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white border-0"
+          >
+            <Sparkles className="w-3 h-3 mr-1" />
+            Apply All Suggestions
+          </Button>
+        </div>
+      )}
+
+      {appliedSuggestions && (
+        <div className="text-xs text-green-600 text-center py-2 bg-green-50 rounded">
+          ✓ AI suggestions applied! You can still modify tags and priority manually.
+        </div>
+      )}
+
+      <div className="text-xs text-muted-foreground pt-2 border-t border-purple-200">
+        💡 These suggestions are based on similar tickets and common patterns.
+      </div>
+    </div>
   );
 }

@@ -86,159 +86,139 @@ export function SimilaritySuggestions({ title, description, className }: Similar
 
   if (debouncedText.length === 0) {
     return (
-      <Card className={`shadow-md ${className}`}>
-        <CardContent className="p-6">
-          <div className="bg-purple-50 p-4 rounded-lg">
-            <h4 className="flex items-center gap-2 mb-3">
-              <Search className="w-4 h-4 text-purple-600" />
-              Similar Tickets
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              Start typing a title and description to see similar tickets...
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className={`bg-purple-50 p-6 rounded-lg shadow-md ${className}`}>
+        <h4 className="flex items-center gap-2 mb-3">
+          <Search className="w-4 h-4 text-purple-600" />
+          Similar Tickets
+        </h4>
+        <p className="text-sm text-muted-foreground">
+          Start typing a title and description to see similar tickets...
+        </p>
+      </div>
     );
   }
 
   if (isLoading) {
     return (
-      <Card className={`shadow-md ${className}`}>
-        <CardContent className="p-6">
-          <div className="bg-purple-50 p-4 rounded-lg">
-            <h4 className="flex items-center gap-2 mb-3">
-              <Search className="w-4 h-4 text-purple-600" />
-              Finding Similar Tickets...
-            </h4>
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-3 w-3/4" />
-                  <div className="flex space-x-2">
-                    <Skeleton className="h-6 w-16" />
-                    <Skeleton className="h-6 w-20" />
-                  </div>
-                </div>
-              ))}
+      <div className={`bg-purple-50 p-6 rounded-lg shadow-md ${className}`}>
+        <h4 className="flex items-center gap-2 mb-3">
+          <Search className="w-4 h-4 text-purple-600" />
+          Finding Similar Tickets...
+        </h4>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-3 w-3/4" />
+              <div className="flex space-x-2">
+                <Skeleton className="h-6 w-16" />
+                <Skeleton className="h-6 w-20" />
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          ))}
+        </div>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Card className={`shadow-md ${className}`}>
-        <CardContent className="p-6">
-          <div className="bg-red-50 p-4 rounded-lg">
-            <h4 className="flex items-center gap-2 mb-3">
-              <AlertCircle className="w-4 h-4 text-red-600" />
-              Error Loading Similar Tickets
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              Unable to load similar tickets. Please try again later.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className={`bg-red-50 p-6 rounded-lg shadow-md ${className}`}>
+        <h4 className="flex items-center gap-2 mb-3">
+          <AlertCircle className="w-4 h-4 text-red-600" />
+          Error Loading Similar Tickets
+        </h4>
+        <p className="text-sm text-muted-foreground">
+          Unable to load similar tickets. Please try again later.
+        </p>
+      </div>
     );
   }
 
   if (!similarTickets || similarTickets.length === 0) {
     return (
-      <Card className={`shadow-md ${className}`}>
-        <CardContent className="p-6">
-          <div className="bg-green-50 p-4 rounded-lg">
-            <h4 className="flex items-center gap-2 mb-3">
-              <Search className="w-4 h-4 text-green-600" />
-              No Similar Tickets Found
-            </h4>
-            <p className="text-sm text-muted-foreground">
-              Great! This appears to be a unique issue. No similar tickets were found.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className={`bg-green-50 p-6 rounded-lg shadow-md ${className}`}>
+        <h4 className="flex items-center gap-2 mb-3">
+          <Search className="w-4 h-4 text-green-600" />
+          No Similar Tickets Found
+        </h4>
+        <p className="text-sm text-muted-foreground">
+          Great! This appears to be a unique issue. No similar tickets were found.
+        </p>
+      </div>
     );
   }
 
   return (
-    <Card className={`shadow-md ${className}`}>
-      <CardContent className="p-6">
-        <div className="bg-purple-50 p-4 rounded-lg space-y-4">
-          <h4 className="flex items-center gap-2">
-            <Search className="w-4 h-4 text-purple-600" />
-            Similar Tickets Found ({similarTickets.length})
-          </h4>
+    <div className={`bg-purple-50 p-6 rounded-lg shadow-md space-y-4 ${className}`}>
+      <h4 className="flex items-center gap-2">
+        <Search className="w-4 h-4 text-purple-600" />
+        Similar Tickets Found ({similarTickets.length})
+      </h4>
 
-          <div className="text-sm text-muted-foreground">
-            Review these similar tickets before creating a new one to avoid duplicates:
-          </div>
+      <div className="text-sm text-muted-foreground">
+        Review these similar tickets before creating a new one to avoid duplicates:
+      </div>
 
-          {similarTickets.map((ticket) => (
-            <div
-              key={ticket.id}
-              className="bg-white border border-purple-200 rounded-lg p-3 hover:shadow-sm transition-shadow"
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-medium text-gray-900 truncate">
-                    {ticket.title}
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                    {ticket.description}
-                  </p>
-                </div>
-                <div className="ml-3 flex-shrink-0">
-                  <span className={`text-xs font-medium ${getSimilarityColor(ticket.similarity_score)}`}>
-                    {getSimilarityLabel(ticket.similarity_score)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Badge variant="secondary" className={`${getStatusColor(ticket.status as TicketStatus)} text-xs`}>
-                    {formatStatus(ticket.status as TicketStatus)}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {ticket.team_name}
-                  </span>
-                  <span className="text-xs text-muted-foreground flex items-center">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {new Date(ticket.created_at).toLocaleDateString()}
-                  </span>
-                </div>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs h-6 px-2"
-                  onClick={() => window.open(`/tickets/${ticket.id}`, '_blank')}
-                >
-                  <ExternalLink className="w-3 h-3 mr-1" />
-                  View
-                </Button>
-              </div>
-
-              {ticket.similarity_score >= 0.8 && (
-                <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                  <AlertCircle className="w-3 h-3 inline mr-1" />
-                  <strong>Potential Duplicate:</strong> This ticket seems very similar to yours.
-                  Consider commenting on the existing ticket instead.
-                </div>
-              )}
+      {similarTickets.map((ticket) => (
+        <div
+          key={ticket.id}
+          className="bg-white border border-purple-200 rounded-lg p-3 hover:shadow-sm transition-shadow"
+        >
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex-1 min-w-0">
+              <h4 className="text-sm font-medium text-gray-900 truncate">
+                {ticket.title}
+              </h4>
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                {ticket.description}
+              </p>
             </div>
-          ))}
-
-          <div className="text-xs text-muted-foreground pt-2 border-t border-purple-200">
-            💡 Tip: If your issue is similar but different, mention the related ticket number in your description.
+            <div className="ml-3 flex-shrink-0">
+              <span className={`text-xs font-medium ${getSimilarityColor(ticket.similarity_score)}`}>
+                {getSimilarityLabel(ticket.similarity_score)}
+              </span>
+            </div>
           </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Badge variant="secondary" className={`${getStatusColor(ticket.status as TicketStatus)} text-xs`}>
+                {formatStatus(ticket.status as TicketStatus)}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {ticket.team_name}
+              </span>
+              <span className="text-xs text-muted-foreground flex items-center">
+                <Clock className="w-3 h-3 mr-1" />
+                {new Date(ticket.created_at).toLocaleDateString()}
+              </span>
+            </div>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-6 px-2"
+              onClick={() => window.open(`/tickets/${ticket.id}`, '_blank')}
+            >
+              <ExternalLink className="w-3 h-3 mr-1" />
+              View
+            </Button>
+          </div>
+
+          {ticket.similarity_score >= 0.8 && (
+            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+              <AlertCircle className="w-3 h-3 inline mr-1" />
+              <strong>Potential Duplicate:</strong> This ticket seems very similar to yours.
+              Consider commenting on the existing ticket instead.
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+      ))}
+
+      <div className="text-xs text-muted-foreground pt-2 border-t border-purple-200">
+        💡 Tip: If your issue is similar but different, mention the related ticket number in your description.
+      </div>
+    </div>
   );
 }

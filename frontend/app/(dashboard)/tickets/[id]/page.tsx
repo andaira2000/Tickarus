@@ -1,6 +1,6 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -38,6 +38,7 @@ interface TicketDetailPageProps {
 function TicketDetailContent({ ticketId }: { ticketId: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ['ticket', ticketId],
@@ -178,22 +179,62 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
-        
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">{ticket.title}</h1>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>#{ticket.id.slice(-6)}</span>
-              <span>•</span>
-              <div className="flex items-center gap-1">
-                <div className={`w-2 h-2 rounded-full ${getPriorityColor(ticket.priority)}`}></div>
-                <span className="capitalize">{formatPriority(ticket.priority)} Priority</span>
-              </div>
-              <span>•</span>
-              <Badge variant="secondary" className={getStatusColor(ticket.status)}>
-                {formatStatus(ticket.status)}
-              </Badge>
+
+        <div className="flex-1">
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">{ticket.title}</h1>
+
+          <div className="flex items-center gap-3 text-sm text-muted-foreground mb-4">
+            <span>#{ticket.id.slice(-6)}</span>
+            <span>•</span>
+            <div className="flex items-center gap-1">
+              <div className={`w-2 h-2 rounded-full ${getPriorityColor(ticket.priority)}`}></div>
+              <span className="capitalize">{formatPriority(ticket.priority)} Priority</span>
             </div>
+            <span>•</span>
+            <Badge variant="secondary" className={getStatusColor(ticket.status)}>
+              {formatStatus(ticket.status)}
+            </Badge>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4" />
+                <span className="font-medium text-gray-700">Reporter:</span>
+                <TicketCreator ticket={ticket} showAvatar={false} />
+              </div>
+
+              {ticket.assignee_id && (
+                <>
+                  <span>•</span>
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    <span className="font-medium text-gray-700">Assignee:</span>
+                    <span>User {ticket.assignee_id}</span>
+                  </div>
+                </>
+              )}
+
+              <span>•</span>
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                <span className="font-medium text-gray-700">Created:</span>
+                <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
+              </div>
+
+              {ticket.updated_at && (
+                <>
+                  <span>•</span>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    <span className="font-medium text-gray-700">Updated:</span>
+                    <span>{new Date(ticket.updated_at).toLocaleDateString()}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <AIAnalysis ticketId={ticketId} onOpenChange={setIsAnalysisOpen} />
           </div>
         </div>
       </div>
@@ -210,27 +251,6 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
               </div>
             </CardContent>
           </Card>
-
-          {ticket.tags && ticket.tags.length > 0 && (
-            <Card className="shadow-md">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Tag className="w-4 h-4 mr-2" />
-                  Tags
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {ticket.tags.map((tag) => (
-                    <Badge key={tag} variant="outline">
-                      <Tag className="w-3 h-3 mr-1" />
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           <Card className="shadow-md">
             <CardHeader>
@@ -461,63 +481,27 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          <Card className="shadow-md">
-            <CardContent className="space-y-3 p-6">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <User className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-medium">Reporter</span>
-                  </div>
-                  <div className="ml-6">
-                    <TicketCreator ticket={ticket} showAvatar={true} />
-                  </div>
-                </div>
-
-                {ticket.assignee_id && (
+                {ticket.tags && ticket.tags.length > 0 && (
                   <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <User className="w-4 h-4 text-muted-foreground" />
-                      <span className="font-medium">Assignee</span>
+                    <label className="text-sm font-medium mb-2 block text-gray-700">Tags</label>
+                    <div className="flex flex-wrap gap-2">
+                      {ticket.tags.map((tag) => (
+                        <Badge key={tag} variant="outline">
+                          <Tag className="w-3 h-3 mr-1" />
+                          {tag}
+                        </Badge>
+                      ))}
                     </div>
-                    <p className="text-muted-foreground ml-6">User {ticket.assignee_id}</p>
-                  </div>
-                )}
-
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-medium">Created</span>
-                  </div>
-                  <p className="text-muted-foreground ml-6">
-                    {new Date(ticket.created_at).toLocaleDateString()} at {new Date(ticket.created_at).toLocaleTimeString()}
-                  </p>
-                </div>
-
-                {ticket.updated_at && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Clock className="w-4 h-4 text-muted-foreground" />
-                      <span className="font-medium">Updated</span>
-                    </div>
-                    <p className="text-muted-foreground ml-6">
-                      {new Date(ticket.updated_at).toLocaleDateString()} at {new Date(ticket.updated_at).toLocaleTimeString()}
-                    </p>
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
-
-          <AIAnalysis ticketId={ticketId} />
         </div>
       </div>
 
-      <AIChat ticketId={ticketId} />
+      {!isAnalysisOpen && <AIChat ticketId={ticketId} />}
     </>
   );
 }

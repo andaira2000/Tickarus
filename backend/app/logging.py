@@ -20,20 +20,13 @@ def configure_logging():
 
     root.addHandler(console_handler)
 
-    try:
-        logs_dir = Path(__file__).parent / "logs"
-        logs_dir.mkdir(exist_ok=True)
+    logs_dir = Path(__file__).parent / "logs"
+    logs_dir.mkdir(exist_ok=True)
 
-        log_file = logs_dir / "backend.log"
-        file_handler = logging.handlers.RotatingFileHandler(
-            log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"  # 10MB
-        )
-        file_handler.setLevel(level)
-        file_handler.setFormatter(formatter)
-        root.addHandler(file_handler)
-
-        print(f"Logging configured: stdout + file ({log_file})")
-
-    except Exception as e:
-        print(f"Warning: Could not set up file logging: {e}")
-        print("Continuing with console logging only")
+    log_file = logs_dir / "backend.log"
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+    )
+    file_handler.setLevel(level)
+    file_handler.setFormatter(formatter)
+    root.addHandler(file_handler)

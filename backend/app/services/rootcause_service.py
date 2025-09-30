@@ -185,7 +185,6 @@ class RootCauseService:
     ) -> Dict:
         """Get commit context if this ticket is related to a CI failure"""
         try:
-            # Check if this ticket is linked to a CI failure
             ci_failure_result = (
                 await supabase_client.table("ci_failures")
                 .select("*, github_repositories(full_name)")
@@ -593,7 +592,7 @@ You must output only a single JSON object. No prose, no code fences, no backtick
                 f"Failed to parse LLM response: {e}. Response: {response[:200]}..."
             )
 
-            # Extract text-based analysis as fallback
+            # Extract text analysis as fallback
             content = response.strip()
 
             return {

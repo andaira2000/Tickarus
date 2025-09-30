@@ -121,7 +121,6 @@ class AutoTaggingService:
         return embedding
 
     def _extract_keywords(self, text: str) -> List[str]:
-        """Extract and normalize keywords from text"""
         if not text:
             return []
 
@@ -129,7 +128,7 @@ class AutoTaggingService:
         text = re.sub(r"[^a-z0-9\s\-]", " ", text)
         words = text.split()
 
-        stop_words = {
+        filtered_words = {
             "the",
             "a",
             "an",
@@ -170,7 +169,7 @@ class AutoTaggingService:
             "those",
         }
 
-        return [word for word in words if len(word) > 2 and word not in stop_words]
+        return [word for word in words if len(word) > 2 and word not in filtered_words]
 
     def _analyze_tags(self, text: str) -> List[Dict[str, Any]]:
         """Use BERT embeddings to analyze text and suggest semantically similar tags"""

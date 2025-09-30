@@ -8,8 +8,7 @@ class BaseDBModel(BaseModel):
     id: UUID
     created_at: Optional[datetime] = None
 
-    # Pydantic v2-style config with proper typing
     model_config = ConfigDict(
         from_attributes=True,
-        ser_json_timedelta="iso8601",  # or "float" if you prefer seconds as a number
+        ser_json_timedelta="iso8601",
     )

@@ -20,15 +20,12 @@ class ActorBase(BaseModel):
 
 
 class Actor(ActorBase, BaseDBModel):
-    # Hydrated fields
     updated_at: Optional[datetime] = None
     profile: Optional[Dict[str, Any]] = None
     system_user: Optional[Dict[str, Any]] = None
 
 
 class ActorInfo(BaseModel):
-    """Simplified actor info for display purposes"""
-
     id: UUID
     actor_type: ActorType
     display_name: str

@@ -571,18 +571,6 @@ class EvaluationService:
         ground_truth_similar: Dict[UUID, List[UUID]],
         top_k: int = 3,
     ) -> EvaluationResult:
-        """
-        Evaluate similarity detection accuracy for Question 1:
-        "How often accurate duplicates appear in the top-3 suggestions"
-
-        Args:
-            test_tickets: List of ticket IDs to test
-            ground_truth_similar: Dict mapping ticket_id -> list of truly similar ticket IDs
-            top_k: Number of top suggestions to evaluate (default 3)
-
-        Returns:
-            EvaluationResult with precision, recall, F1 for similarity detection
-        """
         start_time = time.time()
 
         total_hits = 0
@@ -716,174 +704,6 @@ class EvaluationService:
                 {
                     "id": str(evaluation_id),
                     "evaluation_type": "similarity_accuracy",
-                    "metrics": result.metrics,
-                    "detailed_results": result.detailed_results,
-                    "summary": result.summary,
-                    "created_at": result.timestamp.isoformat(),
-                }
-            )
-        )
-
-        return result
-
-    async def evaluate_rootcause_with_commit_context(
-        self,
-        test_tickets: List[UUID],
-        human_ratings: Dict[UUID, int],  # Human rating 1-5 scale
-        test_with_commit_context: bool = True,
-    ) -> EvaluationResult:
-        """
-        Evaluate root cause analysis accuracy for Question 2:
-        Compare AI analysis quality with and without commit context
-
-        Args:
-            test_tickets: List of ticket IDs to test (preferably CI failure tickets)
-            human_ratings: Dict mapping ticket_id -> human quality rating (1-5)
-            test_with_commit_context: Whether to include commit context in analysis
-
-        Returns:
-            EvaluationResult with correlation metrics and accuracy scores
-        """
-        start_time = time.time()
-
-        c = get_service_client()
-        individual_results = []
-        ai_ratings = []
-        human_rating_values = []
-
-        for ticket_id in test_tickets:
-            try:
-                # Perform AI root cause analysis
-                if test_with_commit_context:
-                    analysis = await rootcause_service.analyze_ticket(
-                        ticket_id=ticket_id, user_id=None, client=c
-                    )
-                else:
-                    # Disable commit context for this analysis
-                    # (would need to modify rootcause_service for this)
-                    analysis = await rootcause_service.analyze_ticket(
-                        ticket_id=ticket_id, user_id=None, client=c
-                    )
-
-                # Map AI confidence to 1-5 scale
-                ai_confidence = analysis.get("confidence_score", 0)
-                ai_rating = min(
-                    5, max(1, round(ai_confidence * 5))
-                )  # Convert 0-1 to 1-5
-
-                human_rating = human_ratings.get(ticket_id, 0)
-
-                if human_rating > 0:  # Only include tickets with human ratings
-                    ai_ratings.append(ai_rating)
-                    human_rating_values.append(human_rating)
-
-                    individual_results.append(
-                        {
-                            "ticket_id": str(ticket_id),
-                            "ai_confidence": ai_confidence,
-                            "ai_rating": ai_rating,
-                            "human_rating": human_rating,
-                            "root_cause": analysis.get("root_cause", ""),
-                            "suggestions_count": len(analysis.get("suggestions", [])),
-                            "llm_used": analysis.get("llm_used", False),
-                            "analysis_method": analysis.get(
-                                "analysis_method", "unknown"
-                            ),
-                        }
-                    )
-
-            except Exception as e:
-                logger.error(
-                    f"Error evaluating root cause for ticket {ticket_id}: {str(e)}"
-                )
-                continue
-
-        # Calculate correlation and accuracy metrics
-        if len(ai_ratings) >= 2:  # Need at least 2 data points for correlation
-            import numpy as np
-
-            # Calculate correlation with NaN handling
-            try:
-                correlation_matrix = np.corrcoef(ai_ratings, human_rating_values)
-                correlation = correlation_matrix[0, 1]
-                # Handle NaN values (occurs when one array has no variance)
-                if np.isnan(correlation) or np.isinf(correlation):
-                    correlation = 0.0
-            except:
-                correlation = 0.0
-
-            # Calculate Mean Absolute Error
-            mae = float(
-                np.mean(np.abs(np.array(ai_ratings) - np.array(human_rating_values)))
-            )
-
-            # Calculate accuracy (percentage within 1 point)
-            within_1_point = sum(
-                1
-                for ai, human in zip(ai_ratings, human_rating_values)
-                if abs(ai - human) <= 1
-            )
-            accuracy_within_1 = within_1_point / len(ai_ratings)
-
-            # Average ratings
-            avg_ai_rating = float(np.mean(ai_ratings))
-            avg_human_rating = float(np.mean(human_rating_values))
-        else:
-            correlation = 0.0
-            mae = 0.0
-            accuracy_within_1 = 0.0
-            avg_ai_rating = 0.0
-            avg_human_rating = 0.0
-
-        # Log evaluation metrics (ensure all values are JSON serializable)
-        await MetricsService.log_event(
-            event_type="rootcause_evaluation_completed",
-            ai_feature="rootcause",
-            metadata={
-                "test_tickets_count": len(test_tickets),
-                "with_commit_context": bool(test_with_commit_context),
-                "correlation": float(correlation),
-                "mae": float(mae),
-                "accuracy_within_1": float(accuracy_within_1),
-            },
-            response_time_ms=int((time.time() - start_time) * 1000),
-            client=c,
-        )
-
-        # Create evaluation result
-        from uuid import uuid4
-
-        evaluation_id = uuid4()
-
-        result = EvaluationResult(
-            evaluation_id=evaluation_id,
-            evaluation_type="rootcause_accuracy",
-            metrics={
-                "correlation": float(correlation),
-                "mae": float(mae),
-                "accuracy_within_1": float(accuracy_within_1),
-                "avg_ai_rating": float(avg_ai_rating),
-                "avg_human_rating": float(avg_human_rating),
-                "total_evaluations": len(ai_ratings),
-            },
-            detailed_results={
-                "individual_results": individual_results,
-                "test_parameters": {
-                    "with_commit_context": test_with_commit_context,
-                    "rating_scale": "1-5",
-                    "test_tickets_count": len(test_tickets),
-                },
-            },
-            summary=f"Root cause evaluation ({'with' if test_with_commit_context else 'without'} commit context): {correlation:.3f} correlation, {accuracy_within_1:.1%} within 1 point",
-            timestamp=datetime.utcnow(),
-        )
-
-        # Store result in database
-        exec_query(
-            c.table("evaluation_results").insert(
-                {
-                    "id": str(evaluation_id),
-                    "evaluation_type": "rootcause_accuracy",
                     "metrics": result.metrics,
                     "detailed_results": result.detailed_results,
                     "summary": result.summary,
@@ -1059,8 +879,6 @@ class EvaluationService:
         requests_per_user: int = 10,
         test_ticket_ids: Optional[List[UUID]] = None,
     ) -> EvaluationResult:
-        """Evaluate system performance under varying loads."""
-
         supabase_client = get_service_client()
 
         start_time = time.time()

@@ -54,7 +54,6 @@ class AIAutomationService:
         similar_tickets = analysis.get("similar_resolved_tickets", [])
         llm_used = analysis.get("llm_used", False)
 
-        # Format confidence level
         if confidence >= 0.8:
             confidence_text = "High"
             confidence_emoji = "🟢"
@@ -82,7 +81,6 @@ class AIAutomationService:
             for ticket in similar_tickets[:3]:  # Show max 3
                 comment += f"\n- #{ticket['id'][:8]}... - {ticket['title']}"
 
-        # Add analysis metadata
         method_text = "LLM-powered" if llm_used else "Pattern-based"
         comment += f"\n\n---\n*Analysis method: {method_text} • Generated at {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}*"
 

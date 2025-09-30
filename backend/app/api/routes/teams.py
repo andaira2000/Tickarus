@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from typing import List
 from uuid import UUID
 from app.api.dependencies import get_current_user_id, get_supabase_request_client

@@ -7,7 +7,6 @@ from app.api.dependencies import get_current_user
 from app.services.evaluation_service import (
     evaluation_service,
 )
-from app.db.database import get_service_client
 
 router = APIRouter(prefix="/evaluation", tags=["evaluation"])
 
@@ -46,9 +45,8 @@ class TestDataGenerationRequest(BaseModel):
 async def evaluate_similarity_accuracy(
     request: SimilarityEvaluationRequest, current_user=Depends(get_current_user)
 ):
-    """Evaluate similarity detection accuracy (Research Question 1)"""
+    """Evaluate similarity detection accuracy"""
     try:
-        # Convert string keys back to UUIDs
         ground_truth_similar = {
             UUID(k): [UUID(tid) for tid in v]
             for k, v in request.ground_truth_similar.items()
@@ -72,40 +70,12 @@ async def evaluate_similarity_accuracy(
         raise HTTPException(status_code=500, detail=f"Evaluation failed: {str(e)}")
 
 
-@router.post("/rootcause", response_model=Dict[str, Any])
-async def evaluate_rootcause_accuracy(
-    request: RootCauseEvaluationRequest, current_user=Depends(get_current_user)
-):
-    """Evaluate root cause analysis accuracy (Research Question 2)"""
-    try:
-        # Convert string keys back to UUIDs
-        human_ratings = {UUID(k): v for k, v in request.human_ratings.items()}
-
-        result = await evaluation_service.evaluate_rootcause_with_commit_context(
-            test_tickets=request.test_ticket_ids,
-            human_ratings=human_ratings,
-            test_with_commit_context=request.test_with_commit_context,
-        )
-
-        return {
-            "evaluation_type": "rootcause_accuracy",
-            "metrics": result.metrics,
-            "detailed_results": result.detailed_results,
-            "summary": result.summary,
-            "evaluation_id": str(result.evaluation_id),
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Evaluation failed: {str(e)}")
-
-
 @router.post("/tagging", response_model=Dict[str, Any])
 async def evaluate_tagging_accuracy(
     request: TaggingEvaluationRequest, current_user=Depends(get_current_user)
 ):
-    """Evaluate auto-tagging and prioritization accuracy (Research Question 3)"""
+    """Evaluate auto-tagging and prioritization accuracy"""
     try:
-        # Convert string keys back to UUIDs
         ground_truth_tags = {UUID(k): v for k, v in request.ground_truth_tags.items()}
         ground_truth_priorities = {
             UUID(k): v for k, v in request.ground_truth_priorities.items()
@@ -133,7 +103,7 @@ async def evaluate_tagging_accuracy(
 async def evaluate_performance(
     request: PerformanceEvaluationRequest, current_user=Depends(get_current_user)
 ):
-    """Evaluate system performance under load"""
+    """Evaluate system performance under load."""
     try:
         result = await evaluation_service.run_performance_benchmark(
             concurrent_users=request.concurrent_users,
@@ -157,7 +127,7 @@ async def evaluate_performance(
 async def generate_test_data(
     request: TestDataGenerationRequest, current_user=Depends(get_current_user)
 ):
-    """Generate synthetic test data for dissertation evaluation"""
+    """Generate synthetic test data"""
     try:
         result = await evaluation_service.generate_test_dataset(
             num_tickets=request.num_tickets,
@@ -179,65 +149,3 @@ async def generate_test_data(
         raise HTTPException(
             status_code=500, detail=f"Test data generation failed: {str(e)}"
         )
-
-
-@router.get("/results/{evaluation_id}")
-async def get_evaluation_results(
-    evaluation_id: UUID, current_user=Depends(get_current_user)
-):
-    """Retrieve stored evaluation results"""
-    try:
-        c = get_service_client()
-        from app.db.database import exec_query
-
-        resp = exec_query(
-            c.table("evaluation_results")
-            .select("*")
-            .eq("id", str(evaluation_id))
-            .single()
-        )
-
-        if not resp.data:
-            raise HTTPException(status_code=404, detail="Evaluation results not found")
-
-        return resp.data
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve results: {str(e)}"
-        )
-
-
-@router.get("/summary")
-async def get_evaluation_summary(current_user=Depends(get_current_user)):
-    """Get summary of all evaluation runs for dissertation report"""
-    try:
-        c = get_service_client()
-        from app.db.database import exec_query
-
-        resp = exec_query(
-            c.table("evaluation_results")
-            .select("id, evaluation_type, created_at, metrics, summary")
-            .order("created_at", desc=True)
-            .limit(50)
-        )
-
-        evaluations = resp.data or []
-
-        # Aggregate summary statistics
-        summary_stats = {
-            "total_evaluations": len(evaluations),
-            "by_type": {},
-            "recent_results": evaluations[:10],
-        }
-
-        for eval_result in evaluations:
-            eval_type = eval_result.get("evaluation_type", "unknown")
-            if eval_type not in summary_stats["by_type"]:
-                summary_stats["by_type"][eval_type] = 0
-            summary_stats["by_type"][eval_type] += 1
-
-        return summary_stats
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get summary: {str(e)}")

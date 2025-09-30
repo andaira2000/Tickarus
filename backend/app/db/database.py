@@ -20,7 +20,7 @@ async def init_supabase_service_client():
 
 def get_service_client() -> AsyncClient:
     if not service_client:
-        raise Exception("Supabase service client not initialized")
+        raise Exception("supabase service client not initialized")
     return service_client
 
 

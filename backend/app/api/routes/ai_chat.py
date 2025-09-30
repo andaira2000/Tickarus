@@ -22,7 +22,7 @@ async def create_chat_session(
     session_data: ChatSessionCreate,
     current_user_id: UUID = Depends(get_current_user_id),
 ):
-    """Create a new AI chat session for a ticket"""
+    """Create a new AI chat session for a ticket."""
     try:
         session = await ai_chat_service.create_chat_session(
             session_data=session_data, user_id=current_user_id
@@ -54,7 +54,7 @@ async def get_chat_session_with_messages(
     ),
     current_user_id: UUID = Depends(get_current_user_id),
 ):
-    """Get a chat session with its messages"""
+    """Get a chat session with its messages."""
     session = await ai_chat_service.get_chat_session(
         session_id=session_id, user_id=current_user_id
     )
@@ -75,7 +75,7 @@ async def send_chat_message(
     message_data: ChatMessageCreate,
     current_user_id: UUID = Depends(get_current_user_id),
 ):
-    """Send a message to the AI assistant"""
+    """Send a message to the AI assistent"""
     try:
         response = await ai_chat_service.send_message(
             session_id=session_id, message_data=message_data, user_id=current_user_id

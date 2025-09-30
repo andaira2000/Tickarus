@@ -19,7 +19,6 @@ class CommentUpdate(BaseModel):
 
 
 class Comment(BaseDBModel, CommentBase):
-    # Hydrated fields
     actor_id: UUID
     is_ai: bool = False
     updated_at: Optional[datetime] = None

@@ -293,7 +293,6 @@ class TicketService:
             .execute()
         ).data["name"]
 
-        # Get creator info from actors
         creator_info = None
 
         actor = (

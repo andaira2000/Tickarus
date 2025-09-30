@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     github_org_name: str = "tickarus-demo-org"
     github_webhook_secret: str = ""
 
-    llm_provider: str = "mock"
+    llm_provider: str = "anthropic"
     openai_api_key: str = ""
     openai_model: str = "gpt-3.5-turbo"
     anthropic_api_key: str = ""

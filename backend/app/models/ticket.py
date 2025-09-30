@@ -50,7 +50,6 @@ class TicketUpdate(BaseModel):
 
 
 class Ticket(TicketBase, BaseDBModel):
-    # Hydrated fields
     actor_id: UUID
     updated_at: Optional[datetime] = None
     last_activity_at: Optional[datetime] = None

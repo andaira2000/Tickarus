@@ -1059,7 +1059,6 @@ class GitHubService:
                         else ""
                     )
 
-                    # Include code files and configuration files
                     if file_ext in code_extensions or any(
                         name in file_path.lower()
                         for name in ["makefile", "dockerfile", "readme", "license"]

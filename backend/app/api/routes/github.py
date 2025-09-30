@@ -76,7 +76,7 @@ async def handle_ci_failure_webhook(
     request: Request,
     supabase_client: AsyncClient = Depends(get_supabase_service_client),
 ):
-    """Handle GitHub webhook for CI/CD failures."""
+    """Handle GitHub webhook for CI failures."""
     payload = await request.body()
 
     payload_data = json.loads(payload.decode("utf-8"))

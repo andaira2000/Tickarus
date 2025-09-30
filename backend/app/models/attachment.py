@@ -1,4 +1,3 @@
-# Stub for future file upload/attachments
 from typing import Optional
 from pydantic import BaseModel
 from uuid import UUID

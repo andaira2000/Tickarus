@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional
 from pydantic import BaseModel, Field
 from uuid import UUID
 from enum import Enum
@@ -25,14 +25,12 @@ class TeamUpdate(BaseModel):
 
 
 class Team(TeamBase, BaseDBModel):
-    # Hydrated fields
     created_by: UUID
     members_count: Optional[int] = 0
     creator_info: Optional[dict] = None
 
 
 class TeamMember(BaseModel):
-    # Hydrated fields
     team_id: UUID
     user_id: UUID
     role: TeamRole = TeamRole.MEMBER

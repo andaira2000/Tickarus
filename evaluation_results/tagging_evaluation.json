@@ -1,0 +1,861 @@
+{
+  "evaluation_type": "tagging_accuracy",
+  "metrics": {
+    "tag_precision": 0.5873015873015873,
+    "tag_recall": 0.6491228070175439,
+    "tag_f1": 0.6166666666666668,
+    "priority_accuracy": 0.8545454545454545,
+    "tag_hits": 74,
+    "tag_predicted": 126,
+    "tag_relevant": 114,
+    "priority_correct": 47,
+    "priority_total": 55
+  },
+  "detailed_results": {
+    "individual_results": [
+      {
+        "ticket_id": "1a1b6455-7e96-4c62-9598-f18af673ec03",
+        "predicted_tags": [
+          "security",
+          "frontend"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "frontend",
+          "ui"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "medium",
+        "tag_hits": 1,
+        "priority_correct": false
+      },
+      {
+        "ticket_id": "30e0658c-6daa-432e-938b-67c4d7edc965",
+        "predicted_tags": [
+          "frontend"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "frontend",
+          "ui"
+        ],
+        "predicted_priority": "low",
+        "ground_truth_priority": "medium",
+        "tag_hits": 1,
+        "priority_correct": false
+      },
+      {
+        "ticket_id": "f3954584-27cd-47d7-88dc-bc7c48fab7e9",
+        "predicted_tags": [
+          "database"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "database"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "c17d1a57-64e2-4fd1-be55-14f826fe75a8",
+        "predicted_tags": [
+          "database"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "database"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "30cd0430-bd07-4f75-8e81-ccb8d80d2a6e",
+        "predicted_tags": [
+          "networking",
+          "performance"
+        ],
+        "ground_truth_tags": [
+          "infrastructure",
+          "networking"
+        ],
+        "predicted_priority": "high",
+        "ground_truth_priority": "medium",
+        "tag_hits": 1,
+        "priority_correct": false
+      },
+      {
+        "ticket_id": "b2b1acdb-c975-4d74-930d-192d4b2e43f2",
+        "predicted_tags": [
+          "database",
+          "backend",
+          "api",
+          "networking",
+          "performance"
+        ],
+        "ground_truth_tags": [
+          "infrastructure",
+          "networking"
+        ],
+        "predicted_priority": "high",
+        "ground_truth_priority": "medium",
+        "tag_hits": 1,
+        "priority_correct": false
+      },
+      {
+        "ticket_id": "da652e77-b4ed-41b1-bce4-4930cb300e82",
+        "predicted_tags": [
+          "database",
+          "backend",
+          "bug",
+          "security",
+          "networking"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "security",
+          "backend"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 3,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "213db782-4b26-4ff9-bd40-28b9675e544c",
+        "predicted_tags": [
+          "database",
+          "backend",
+          "testing",
+          "bug",
+          "security",
+          "networking"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "security",
+          "backend"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 3,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "fc4da274-c504-4c68-8e48-fd39122d475e",
+        "predicted_tags": [
+          "database",
+          "backend",
+          "bug",
+          "security",
+          "networking"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "security",
+          "backend"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 3,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "261aa018-64b5-4e11-93e9-87a93482e8e5",
+        "predicted_tags": [
+          "database"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "database"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "c7cf8ea8-f96f-4a2f-bdc5-d8f38dabbd22",
+        "predicted_tags": [
+          "database"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "database"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "b28be3d4-c966-4cf2-b8a2-bdab823c23f1",
+        "predicted_tags": [
+          "database"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "database"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "7d0a7b00-d997-41bd-a4ea-f7d70d292662",
+        "predicted_tags": [
+          "database"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "database"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "5e2c6d36-0133-4de0-a52d-c8dac737411a",
+        "predicted_tags": [
+          "bug",
+          "security",
+          "networking",
+          "backend"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "security",
+          "backend"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 3,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "68ba08fe-87b9-43c3-838c-8196de0a1b44",
+        "predicted_tags": [
+          "database",
+          "backend",
+          "bug",
+          "security",
+          "networking"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "security",
+          "backend"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 3,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "87466e63-7167-42ef-8c89-228d2673e497",
+        "predicted_tags": [
+          "database",
+          "backend",
+          "testing",
+          "bug",
+          "security",
+          "networking"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "security",
+          "backend"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 3,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "38d533fa-d99a-45c4-b046-10be21bfb145",
+        "predicted_tags": [
+          "database",
+          "backend",
+          "bug",
+          "security",
+          "networking"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "security",
+          "backend"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 3,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "e96ded83-39ef-4322-a7d4-1ecd172910fa",
+        "predicted_tags": [
+          "database",
+          "backend",
+          "bug",
+          "security",
+          "networking"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "security",
+          "backend"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 3,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "bbcfd2c0-0b0d-4f6e-b259-74ec74a38a7b",
+        "predicted_tags": [],
+        "ground_truth_tags": [
+          "feature"
+        ],
+        "predicted_priority": "low",
+        "ground_truth_priority": "low",
+        "tag_hits": 0,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "4ada403c-0985-4290-b161-84b0c526cf2e",
+        "predicted_tags": [
+          "feature"
+        ],
+        "ground_truth_tags": [
+          "feature"
+        ],
+        "predicted_priority": "low",
+        "ground_truth_priority": "low",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "19365c26-c09b-4170-9464-bbc46888495d",
+        "predicted_tags": [
+          "feature"
+        ],
+        "ground_truth_tags": [
+          "feature"
+        ],
+        "predicted_priority": "low",
+        "ground_truth_priority": "low",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "c30f558a-f4e1-4ebe-b378-42d847a721af",
+        "predicted_tags": [
+          "feature"
+        ],
+        "ground_truth_tags": [
+          "feature"
+        ],
+        "predicted_priority": "low",
+        "ground_truth_priority": "low",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "80a45cb1-f21a-4a34-adce-591452bd6595",
+        "predicted_tags": [
+          "feature",
+          "documentation"
+        ],
+        "ground_truth_tags": [
+          "documentation"
+        ],
+        "predicted_priority": "low",
+        "ground_truth_priority": "low",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "8152cb58-1726-425c-b976-5564baef5176",
+        "predicted_tags": [
+          "feature",
+          "documentation"
+        ],
+        "ground_truth_tags": [
+          "documentation"
+        ],
+        "predicted_priority": "low",
+        "ground_truth_priority": "low",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "8b843320-9c09-410f-b953-2f4b96719c4c",
+        "predicted_tags": [
+          "database"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "database"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "84d13cea-0fdf-4caa-8f99-cfb7d6f1996a",
+        "predicted_tags": [
+          "networking",
+          "security",
+          "database"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "database"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "c9292f0b-75f4-465f-b14d-ca108d87c96e",
+        "predicted_tags": [
+          "networking",
+          "security",
+          "database"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "database"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "e23d256e-4bb4-4d92-9351-fda04668f016",
+        "predicted_tags": [
+          "database"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "database"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "2f32422e-f8de-477c-86f7-a67f30c3027c",
+        "predicted_tags": [
+          "database"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "database"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "07e87ff3-a792-4102-8be3-3f858405a1c5",
+        "predicted_tags": [
+          "testing"
+        ],
+        "ground_truth_tags": [
+          "infrastructure",
+          "testing"
+        ],
+        "predicted_priority": "medium",
+        "ground_truth_priority": "medium",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "e15947d0-8459-4dbc-82ef-5f35fc0a38df",
+        "predicted_tags": [
+          "infrastructure",
+          "testing"
+        ],
+        "ground_truth_tags": [
+          "infrastructure",
+          "testing"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "medium",
+        "tag_hits": 2,
+        "priority_correct": false
+      },
+      {
+        "ticket_id": "77f8b538-871b-40aa-8db7-bc57ca81fcff",
+        "predicted_tags": [
+          "infrastructure",
+          "bug",
+          "testing"
+        ],
+        "ground_truth_tags": [
+          "infrastructure",
+          "testing"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "medium",
+        "tag_hits": 2,
+        "priority_correct": false
+      },
+      {
+        "ticket_id": "e903612f-8468-4796-a7ad-64a70179bc18",
+        "predicted_tags": [],
+        "ground_truth_tags": [
+          "documentation"
+        ],
+        "predicted_priority": "low",
+        "ground_truth_priority": "low",
+        "tag_hits": 0,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "62f6836c-c281-4db1-9391-8bf5f92d99b6",
+        "predicted_tags": [
+          "database",
+          "backend",
+          "testing",
+          "bug",
+          "security",
+          "networking"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "security",
+          "backend"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 3,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "1cd6fad5-b185-40f4-ad98-cc367f725374",
+        "predicted_tags": [
+          "security",
+          "frontend"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "frontend",
+          "ui"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "medium",
+        "tag_hits": 1,
+        "priority_correct": false
+      },
+      {
+        "ticket_id": "0a366c85-f33d-4d66-bae0-99c3d9c383a0",
+        "predicted_tags": [
+          "feature"
+        ],
+        "ground_truth_tags": [
+          "documentation"
+        ],
+        "predicted_priority": "low",
+        "ground_truth_priority": "low",
+        "tag_hits": 0,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "afe5e6e8-e670-4452-9653-95de01b97940",
+        "predicted_tags": [
+          "backend",
+          "testing",
+          "api",
+          "bug",
+          "security"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "api",
+          "backend"
+        ],
+        "predicted_priority": "high",
+        "ground_truth_priority": "high",
+        "tag_hits": 3,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "e4ce2409-e4e3-4348-8ce2-c55e358392a3",
+        "predicted_tags": [
+          "security",
+          "testing",
+          "database",
+          "configuration"
+        ],
+        "ground_truth_tags": [
+          "infrastructure",
+          "configuration"
+        ],
+        "predicted_priority": "medium",
+        "ground_truth_priority": "medium",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "647d0c89-c787-4602-9bb0-bcd392f13ec6",
+        "predicted_tags": [
+          "database",
+          "backend",
+          "testing",
+          "bug",
+          "security",
+          "networking"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "security",
+          "backend"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 3,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "3b115b51-a66e-4480-850a-43b3944d95cb",
+        "predicted_tags": [
+          "bug",
+          "performance"
+        ],
+        "ground_truth_tags": [
+          "backend",
+          "performance"
+        ],
+        "predicted_priority": "high",
+        "ground_truth_priority": "high",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "8bf68c99-6d84-462c-b8d5-65cb9c086e4a",
+        "predicted_tags": [
+          "database",
+          "backend",
+          "testing",
+          "bug",
+          "security",
+          "networking"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "security",
+          "backend"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 3,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "b8e8f4c3-4780-4bd3-b511-b54ce8514669",
+        "predicted_tags": [],
+        "ground_truth_tags": [
+          "feature"
+        ],
+        "predicted_priority": "low",
+        "ground_truth_priority": "low",
+        "tag_hits": 0,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "38bbaf2b-188f-4a38-8084-35c00d1536e0",
+        "predicted_tags": [
+          "database"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "database"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "c2e6ae1d-2a6b-4e87-aaf3-10b971657b34",
+        "predicted_tags": [
+          "ui"
+        ],
+        "ground_truth_tags": [
+          "feature"
+        ],
+        "predicted_priority": "low",
+        "ground_truth_priority": "low",
+        "tag_hits": 0,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "21bcb495-5b21-4cc9-9f82-6220bcfb6b60",
+        "predicted_tags": [
+          "backend",
+          "testing",
+          "bug",
+          "security",
+          "networking"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "security",
+          "backend"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 3,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "6d655a09-f6b8-4edb-a487-fe4d4fa1e879",
+        "predicted_tags": [],
+        "ground_truth_tags": [
+          "feature"
+        ],
+        "predicted_priority": "low",
+        "ground_truth_priority": "low",
+        "tag_hits": 0,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "47fd647d-340c-43c0-bd08-d3da8ad69933",
+        "predicted_tags": [],
+        "ground_truth_tags": [
+          "feature"
+        ],
+        "predicted_priority": "low",
+        "ground_truth_priority": "low",
+        "tag_hits": 0,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "884b1edd-85ca-4d4e-b996-2e12f058fd3c",
+        "predicted_tags": [
+          "security",
+          "database"
+        ],
+        "ground_truth_tags": [
+          "bug",
+          "database"
+        ],
+        "predicted_priority": "critical",
+        "ground_truth_priority": "critical",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "f6f5fe37-528c-4632-bb25-d5bcc080de01",
+        "predicted_tags": [
+          "bug",
+          "performance"
+        ],
+        "ground_truth_tags": [
+          "backend",
+          "performance"
+        ],
+        "predicted_priority": "high",
+        "ground_truth_priority": "high",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "9bbd5268-178c-43ea-a91f-1dc2e935c76b",
+        "predicted_tags": [
+          "networking"
+        ],
+        "ground_truth_tags": [
+          "infrastructure",
+          "networking"
+        ],
+        "predicted_priority": "high",
+        "ground_truth_priority": "medium",
+        "tag_hits": 1,
+        "priority_correct": false
+      },
+      {
+        "ticket_id": "45fca13f-1662-4d2e-8587-2b09816adacb",
+        "predicted_tags": [],
+        "ground_truth_tags": [
+          "infrastructure",
+          "testing"
+        ],
+        "predicted_priority": "medium",
+        "ground_truth_priority": "medium",
+        "tag_hits": 0,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "75dbc36e-843c-41f4-8f20-f0bcd4b7ba30",
+        "predicted_tags": [
+          "testing"
+        ],
+        "ground_truth_tags": [
+          "infrastructure",
+          "testing"
+        ],
+        "predicted_priority": "medium",
+        "ground_truth_priority": "medium",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "8e7d24f5-c2ba-42ee-9632-d3341364992a",
+        "predicted_tags": [],
+        "ground_truth_tags": [
+          "infrastructure",
+          "testing"
+        ],
+        "predicted_priority": "medium",
+        "ground_truth_priority": "medium",
+        "tag_hits": 0,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "7ea9404f-0743-4622-a002-9c77cfc996a4",
+        "predicted_tags": [
+          "testing"
+        ],
+        "ground_truth_tags": [
+          "infrastructure",
+          "testing"
+        ],
+        "predicted_priority": "medium",
+        "ground_truth_priority": "medium",
+        "tag_hits": 1,
+        "priority_correct": true
+      },
+      {
+        "ticket_id": "246afda2-32b2-4282-9db8-1a9fdb804eeb",
+        "predicted_tags": [
+          "testing"
+        ],
+        "ground_truth_tags": [
+          "infrastructure",
+          "testing"
+        ],
+        "predicted_priority": "medium",
+        "ground_truth_priority": "medium",
+        "tag_hits": 1,
+        "priority_correct": true
+      }
+    ],
+    "test_parameters": {
+      "test_tickets_count": 55
+    }
+  },
+  "summary": "Tagging evaluation: Tags F1 0.617, Priority accuracy 85.5%",
+  "evaluation_id": "be9cf139-0147-4c45-9b95-b9c41a934b3d"
+}

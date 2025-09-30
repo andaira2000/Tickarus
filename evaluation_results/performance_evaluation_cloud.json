@@ -1,0 +1,82 @@
+{
+  "evaluation_type": "performance_benchmark",
+  "metrics": {
+    "max_throughput_rps": 3.2613510108368318,
+    "min_error_rate": 0,
+    "avg_response_time_ms": 4149.928736591339,
+    "max_concurrent_users_tested": 50,
+    "total_requests_tested": 910
+  },
+  "detailed_results": {
+    "performance_by_concurrency": [
+      {
+        "concurrent_users": 1,
+        "total_requests": 10,
+        "total_time_seconds": 16.411844491958618,
+        "avg_response_time_ms": 1641.1584377288818,
+        "p95_response_time_ms": 6669.479477405546,
+        "p99_response_time_ms": 7295.171377658844,
+        "throughput_rps": 0.609316034215395,
+        "error_rate": 0,
+        "errors": 0
+      },
+      {
+        "concurrent_users": 5,
+        "total_requests": 50,
+        "total_time_seconds": 27.100751161575317,
+        "avg_response_time_ms": 1875.613088607788,
+        "p95_response_time_ms": 6397.19351530075,
+        "p99_response_time_ms": 7052.5334215164185,
+        "throughput_rps": 1.8449673111235485,
+        "error_rate": 0,
+        "errors": 0
+      },
+      {
+        "concurrent_users": 10,
+        "total_requests": 100,
+        "total_time_seconds": 41.606871604919434,
+        "avg_response_time_ms": 2711.4034461975098,
+        "p95_response_time_ms": 12304.86406087875,
+        "p99_response_time_ms": 14298.162367343914,
+        "throughput_rps": 2.403449145361277,
+        "error_rate": 0,
+        "errors": 0
+      },
+      {
+        "concurrent_users": 25,
+        "total_requests": 250,
+        "total_time_seconds": 84.20079469680786,
+        "avg_response_time_ms": 5214.179513931274,
+        "p95_response_time_ms": 24614.006936550133,
+        "p99_response_time_ms": 32995.1013970375,
+        "throughput_rps": 2.969093117234887,
+        "error_rate": 0,
+        "errors": 0
+      },
+      {
+        "concurrent_users": 50,
+        "total_requests": 500,
+        "total_time_seconds": 153.31069803237915,
+        "avg_response_time_ms": 9307.289196491241,
+        "p95_response_time_ms": 47627.24813222881,
+        "p99_response_time_ms": 66703.22650909422,
+        "throughput_rps": 3.2613510108368318,
+        "error_rate": 0,
+        "errors": 0
+      }
+    ],
+    "test_parameters": {
+      "concurrent_users_tested": [
+        1,
+        5,
+        10,
+        25,
+        50
+      ],
+      "requests_per_user": 10,
+      "test_tickets_count": 1
+    }
+  },
+  "summary": "Performance benchmark: 3.3 max RPS, 4149.9ms avg response time",
+  "evaluation_id": "1d04a428-eac0-4fb4-b6aa-b4325a5d2ce4"
+}

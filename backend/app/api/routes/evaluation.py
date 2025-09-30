@@ -4,9 +4,8 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.api.dependencies import get_current_user
-from app.services.comprehensive_evaluation_service import (
-    comprehensive_evaluation_service,
-    EvaluationResult,
+from app.services.evaluation_service import (
+    evaluation_service,
 )
 from app.db.database import get_service_client
 
@@ -15,20 +14,20 @@ router = APIRouter(prefix="/evaluation", tags=["evaluation"])
 
 class SimilarityEvaluationRequest(BaseModel):
     test_ticket_ids: List[UUID]
-    ground_truth_similar: Dict[str, List[str]]  # UUID as string keys
+    ground_truth_similar: Dict[str, List[str]]
     top_k: int = 3
 
 
 class RootCauseEvaluationRequest(BaseModel):
     test_ticket_ids: List[UUID]
-    human_ratings: Dict[str, int]  # UUID as string keys, rating 1-5
+    human_ratings: Dict[str, int]
     test_with_commit_context: bool = True
 
 
 class TaggingEvaluationRequest(BaseModel):
     test_ticket_ids: List[UUID]
-    ground_truth_tags: Dict[str, List[str]]  # UUID as string keys
-    ground_truth_priorities: Dict[str, str]  # UUID as string keys
+    ground_truth_tags: Dict[str, List[str]]
+    ground_truth_priorities: Dict[str, str]
 
 
 class PerformanceEvaluationRequest(BaseModel):
@@ -55,7 +54,7 @@ async def evaluate_similarity_accuracy(
             for k, v in request.ground_truth_similar.items()
         }
 
-        result = await comprehensive_evaluation_service.evaluate_similarity_accuracy(
+        result = await evaluation_service.evaluate_similarity_accuracy(
             test_tickets=request.test_ticket_ids,
             ground_truth_similar=ground_truth_similar,
             top_k=request.top_k,
@@ -82,7 +81,7 @@ async def evaluate_rootcause_accuracy(
         # Convert string keys back to UUIDs
         human_ratings = {UUID(k): v for k, v in request.human_ratings.items()}
 
-        result = await comprehensive_evaluation_service.evaluate_rootcause_with_commit_context(
+        result = await evaluation_service.evaluate_rootcause_with_commit_context(
             test_tickets=request.test_ticket_ids,
             human_ratings=human_ratings,
             test_with_commit_context=request.test_with_commit_context,
@@ -112,7 +111,7 @@ async def evaluate_tagging_accuracy(
             UUID(k): v for k, v in request.ground_truth_priorities.items()
         }
 
-        result = await comprehensive_evaluation_service.evaluate_tagging_accuracy(
+        result = await evaluation_service.evaluate_tagging_accuracy(
             test_tickets=request.test_ticket_ids,
             ground_truth_tags=ground_truth_tags,
             ground_truth_priorities=ground_truth_priorities,
@@ -134,9 +133,9 @@ async def evaluate_tagging_accuracy(
 async def evaluate_performance(
     request: PerformanceEvaluationRequest, current_user=Depends(get_current_user)
 ):
-    """Evaluate system performance under load (Research Question 3)"""
+    """Evaluate system performance under load"""
     try:
-        result = await comprehensive_evaluation_service.run_performance_benchmark(
+        result = await evaluation_service.run_performance_benchmark(
             concurrent_users=request.concurrent_users,
             requests_per_user=request.requests_per_user,
             test_ticket_ids=request.test_ticket_ids,
@@ -160,7 +159,7 @@ async def generate_test_data(
 ):
     """Generate synthetic test data for dissertation evaluation"""
     try:
-        result = await comprehensive_evaluation_service.generate_test_dataset(
+        result = await evaluation_service.generate_test_dataset(
             num_tickets=request.num_tickets,
             num_similar_groups=request.num_similar_groups,
             include_commit_failures=request.include_commit_failures,

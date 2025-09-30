@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_supabase_service_client()
-    # await similarity_service.precompute_embeddings_for_existing_tickets()
+    await similarity_service.precompute_embeddings_for_existing_tickets()
 
     provider: LLMProvider
     try:

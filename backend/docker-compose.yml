@@ -14,7 +14,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     volumes:
-      - ./app:/var/task/app # For development hot reload
+      - ./app:/var/task/app
     entrypoint: []
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     networks:

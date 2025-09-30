@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 from datetime import datetime
@@ -91,19 +92,14 @@ class RootCauseService:
             },
         ]
 
-    @staticmethod
-    def _c():
-        return get_supabase()
-
     def _extract_keywords(self, text: str) -> List[str]:
         """Extract relevant keywords from ticket content"""
         if not text:
             return []
 
-        # Simple keyword extraction - normalize and split
         words = text.lower().replace(",", " ").replace(".", " ").split()
-        # Filter out common words and short words
-        stop_words = {
+
+        filtered_words = {
             "the",
             "a",
             "an",
@@ -139,7 +135,7 @@ class RootCauseService:
             "can",
             "must",
         }
-        return [word for word in words if len(word) > 2 and word not in stop_words]
+        return [word for word in words if len(word) > 2 and word not in filtered_words]
 
     def _match_patterns(self, keywords: List[str]) -> Optional[Dict[str, Any]]:
         """Match keywords against known patterns"""
@@ -219,11 +215,8 @@ class RootCauseService:
                 include_full_codebase=True,
             )
 
-            logger.info(
-                f"Retrieved commit context for ticket {ticket['id']}: {commit_context}"
-            )
+            logger.info(f"Retrieved commit context for ticket {ticket['id']}")
 
-            # Add CI failure context
             commit_context.update(
                 {
                     "available": True,
@@ -287,7 +280,6 @@ class RootCauseService:
 
             if use_llm:
                 try:
-                    # Use LLM for analysis with commit context
                     analysis = await self._llm_analyze_ticket(
                         ticket, recent_comments, similar_tickets, commit_context
                     )
@@ -322,7 +314,6 @@ class RootCauseService:
                     ),
                 }
 
-            # Build final analysis result with commit context metadata
             final_analysis = {
                 "ticket_id": str(ticket_id),
                 "analysis_timestamp": time.time(),
@@ -336,16 +327,8 @@ class RootCauseService:
                 "keywords_analyzed": keywords[:10],
                 "analysis_method": analysis.get("analysis_method", "llm"),
                 "llm_used": analysis.get("analysis_method") == "llm",
-                "commit_context_used": commit_context
-                and commit_context.get("available", False),
-                "commit_analysis_summary": (
-                    self._summarize_commit_context(commit_context)
-                    if commit_context and commit_context.get("available")
-                    else None
-                ),
             }
 
-            # Log metrics
             response_time = int((time.time() - start_time) * 1000)
             await MetricsService.log_event(
                 event_type="rootcause_requested",
@@ -385,7 +368,6 @@ class RootCauseService:
     ) -> Dict[str, Any]:
         """Use LLM to analyze ticket and provide root cause analysis"""
 
-        # Build comprehensive context for LLM including commit analysis
         context_parts = [
             f"Title: {ticket['title']}",
             f"Description: {ticket.get('description', 'No description provided')}",
@@ -393,11 +375,9 @@ class RootCauseService:
             f"Team: {ticket.get('teams', {}).get('name', 'unknown') if ticket.get('teams') else 'unknown'}",
         ]
 
-        # Add commit context if available (this is the key enhancement for Question 2)
         if commit_context and commit_context.get("available"):
             context_parts.append("\n=== CODE ANALYSIS ===")
 
-            # Repository context
             repo_info = commit_context.get("repository", {})
             context_parts.append(f"Repository: {repo_info.get('name', 'unknown')}")
             context_parts.append(
@@ -407,7 +387,6 @@ class RootCauseService:
                 f"Tech Stack: {', '.join(repo_info.get('tech_stack', []))}"
             )
 
-            # CI failure context
             ci_info = commit_context.get("ci_failure", {})
             if ci_info:
                 context_parts.append(f"\nCI Failure Details:")
@@ -422,7 +401,6 @@ class RootCauseService:
                     f"- Failure Reason: {ci_info.get('failure_reason', 'unknown')}"
                 )
 
-            # Commit analysis (the core of the enhancement)
             commit_analysis = commit_context.get("commit_analysis", {})
             if commit_analysis and not commit_analysis.get("error"):
                 context_parts.append(f"\nComplete Repository Commit Analysis:")
@@ -430,23 +408,20 @@ class RootCauseService:
                     f"- Total commits analyzed: {commit_analysis.get('total_commits', 0)}"
                 )
 
-                # Risk indicators
                 risk_indicators = commit_analysis.get("risk_indicators", [])
                 if risk_indicators:
                     context_parts.append("- Risk Indicators:")
-                    for risk in risk_indicators[:3]:  # Top 3 risks
+                    for risk in risk_indicators[:3]:
                         context_parts.append(f"  • {risk}")
 
-                # Latest commits details
                 commits = commit_analysis.get("commits", [])
                 if commits:
                     context_parts.append("- Latest Commits:")
-                    for commit in commits[:5]:  # First 5 commits (most recent)
+                    for commit in commits:
                         context_parts.append(
                             f"  • {commit.get('sha', 'unknown')}: {commit.get('message', 'No message')[:100]}..."
                         )
 
-                        # File changes
                         files = commit.get("files", [])
                         if files:
                             high_risk_files = [
@@ -457,14 +432,13 @@ class RootCauseService:
                                     f"    High-risk files: {', '.join([f['filename'] for f in high_risk_files[:3]])}"
                                 )
 
-            # Log correlation (crucial for root cause)
             correlation = commit_context.get("log_correlation", {})
             culprits = correlation.get("likely_culprits", [])
             if culprits:
                 context_parts.append(
                     f"\nLikely Culprit Commits (based on log correlation):"
                 )
-                for culprit in culprits[:2]:  # Top 2 suspects
+                for culprit in culprits[:2]:
                     commit = culprit.get("commit", {})
                     confidence = culprit.get("confidence_score", 0)
                     reasons = culprit.get("reasons", [])
@@ -476,21 +450,18 @@ class RootCauseService:
                     )
                     context_parts.append(f"  Reasons: {'; '.join(reasons[:2])}")
 
-            # Risk assessment
             risk_assessment = commit_context.get("risk_assessment", {})
             if risk_assessment:
                 context_parts.append(
                     f"\nOverall Risk Assessment: {risk_assessment.get('level', 'unknown')} (score: {risk_assessment.get('score', 0)})"
                 )
 
-            # Focus areas suggestions
             focus_areas = commit_context.get("suggested_focus_areas", [])
             if focus_areas:
                 context_parts.append(f"\nSuggested Focus Areas:")
                 for area in focus_areas[:3]:
                     context_parts.append(f"- {area}")
 
-            # Full codebase (for dissertation with small repos)
             full_codebase = commit_context.get("full_codebase")
             if full_codebase and not full_codebase.get("error"):
                 context_parts.append(f"\n=== COMPLETE REPOSITORY CODE ===")
@@ -507,22 +478,18 @@ class RootCauseService:
                     f"Total size: {full_codebase.get('total_size', 0)} bytes"
                 )
 
-                # Add directory structure
                 structure = full_codebase.get("structure", [])
                 if structure:
                     context_parts.append(f"\nDirectory Structure:")
-                    for item in structure[:20]:  # Show first 20 items
+                    for item in structure[:20]:
                         context_parts.append(f"  {item}")
 
-                # Add file contents (prioritized by importance)
                 files = full_codebase.get("files", {})
                 if files:
                     context_parts.append(f"\nFile Contents:")
                     for file_path, file_info in files.items():
                         content = file_info.get("content", "")
-                        if content and not content.startswith(
-                            "["
-                        ):  # Skip error/truncated messages
+                        if content and not content.startswith("["):
                             context_parts.append(f"\n--- {file_path} ---")
                             context_parts.append(content)
                         elif file_info.get("truncated"):
@@ -540,7 +507,6 @@ class RootCauseService:
 
         ticket_context = "\n".join(context_parts)
 
-        # Create enhanced LLM prompt that leverages commit context
         has_commit_context = commit_context and commit_context.get("available")
 
         if has_commit_context:
@@ -603,98 +569,43 @@ You must output only a single JSON object. No prose, no code fences, no backtick
 
         response = await llm_service.generate_response(
             messages=messages,
-            max_tokens=500,
-            temperature=0.3,  # Lower temperature for more consistent analysis
         )
 
-        # Parse LLM response
         try:
-            import json
+            analysis_data = json.loads(response.strip())
 
-            logger.info(f"LLM response: {response.content}")
-            analysis_data = json.loads(response.content.strip())
-
-            # Validate response structure
             required_fields = ["root_cause", "confidence_score", "suggestions"]
             if not all(field in analysis_data for field in required_fields):
                 raise ValueError("LLM response missing required fields")
 
-            # Ensure suggestions is a list
             if not isinstance(analysis_data["suggestions"], list):
                 analysis_data["suggestions"] = [str(analysis_data["suggestions"])]
 
-            # Clamp confidence score
             confidence = float(analysis_data["confidence_score"])
             analysis_data["confidence_score"] = max(0.1, min(1.0, confidence))
 
             analysis_data["analysis_method"] = "llm"
-            analysis_data["token_usage"] = response.usage.get("total_tokens", 0)
 
             return analysis_data
 
         except (json.JSONDecodeError, ValueError, KeyError) as e:
             logger.warning(
-                f"Failed to parse LLM response: {e}. Response: {response.content[:200]}..."
+                f"Failed to parse LLM response: {e}. Response: {response[:200]}..."
             )
 
             # Extract text-based analysis as fallback
-            content = response.content.strip()
+            content = response.strip()
 
             return {
                 "root_cause": content[:200] + "..." if len(content) > 200 else content,
-                "confidence_score": 0.6,  # Medium confidence for unparsed response
+                "confidence_score": 0.6,
                 "suggestions": [
                     "Review the full analysis provided by the AI",
                     "Investigate the symptoms described in the ticket",
                     "Check system logs and error messages",
                 ],
                 "analysis_method": "llm_unparsed",
-                "token_usage": response.usage.get("total_tokens", 0),
             }
 
-    def _summarize_commit_context(self, commit_context: Dict) -> Dict:
-        """Summarize commit context for metadata"""
-        if not commit_context or not commit_context.get("available"):
-            return None
 
-        summary = {}
-
-        # Repository info
-        repo_info = commit_context.get("repository", {})
-        summary["repository"] = repo_info.get("name", "unknown")
-        summary["language"] = repo_info.get("language", "unknown")
-
-        # Commit analysis summary
-        commit_analysis = commit_context.get("commit_analysis", {})
-        if commit_analysis:
-            summary["total_commits"] = commit_analysis.get("total_commits", 0)
-            summary["risk_indicators_count"] = len(
-                commit_analysis.get("risk_indicators", [])
-            )
-
-        # Correlation summary
-        correlation = commit_context.get("log_correlation", {})
-        culprits = correlation.get("likely_culprits", [])
-        if culprits:
-            summary["likely_culprits_count"] = len(culprits)
-            summary["top_culprit_confidence"] = culprits[0].get("confidence_score", 0)
-
-        # Risk assessment
-        risk_assessment = commit_context.get("risk_assessment", {})
-        summary["risk_level"] = risk_assessment.get("level", "unknown")
-        summary["risk_score"] = risk_assessment.get("score", 0)
-
-        # Full codebase usage
-        full_codebase = commit_context.get("full_codebase")
-        summary["full_codebase_used"] = bool(
-            full_codebase and not full_codebase.get("error")
-        )
-        if summary["full_codebase_used"]:
-            summary["codebase_files_count"] = full_codebase.get("total_files", 0)
-            summary["codebase_size_bytes"] = full_codebase.get("total_size", 0)
-
-        return summary
-
-
-# Global instance
 rootcause_service = RootCauseService()

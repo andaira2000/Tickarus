@@ -339,10 +339,6 @@ export function AIAnalysis({ ticketId, className }: AIAnalysisProps) {
             </div>
           )}
         </div>
-
-          <div className="text-xs text-muted-foreground pt-2 border-t border-purple-200">
-            💡 This analysis is AI-generated and should be reviewed by human experts.
-          </div>
         </div>
       </CardContent>
     </Card>

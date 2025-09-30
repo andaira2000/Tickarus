@@ -3,7 +3,6 @@ import time
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 
-import asyncio
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -108,7 +107,6 @@ class SimilarityService:
                     }
                 )
 
-            # Log metrics
             response_time = int((time.time() - start_time) * 1000)
             suggestion_ids = [suggestion["id"] for suggestion in suggestions]
 

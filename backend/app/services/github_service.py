@@ -567,7 +567,6 @@ class GitHubService:
                 },
             }
 
-            # Analyze changed files
             for file in commit.files:
                 file_info = {
                     "filename": file.filename,
@@ -575,12 +574,9 @@ class GitHubService:
                     "additions": file.additions,
                     "deletions": file.deletions,
                     "changes": file.changes,
-                    "patch": (
-                        file.patch[:1000] if file.patch else None
-                    ),  # First 1000 chars
+                    "patch": (file.patch[:1000] if file.patch else None),
                 }
 
-                # Add code analysis for this file
                 file_info.update(self._analyze_file_changes(file))
                 commit_data["files"].append(file_info)
 

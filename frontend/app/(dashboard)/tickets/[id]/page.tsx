@@ -514,9 +514,10 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
           </Card>
 
           <AIAnalysis ticketId={ticketId} />
-          <AIChat ticketId={ticketId} />
         </div>
       </div>
+
+      <AIChat ticketId={ticketId} />
     </>
   );
 }

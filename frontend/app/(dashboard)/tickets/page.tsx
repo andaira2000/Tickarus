@@ -223,12 +223,12 @@ function TicketsContent() {
     <>
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">
-          {activeTab === 'my' ? 'My Tickets' : 'Ticket Management System'}
+          {activeTab === 'my' ? 'My Tickets' : 'Browse Tickets'}
         </h1>
         <p className="mt-2 text-gray-600">
           {activeTab === 'my'
             ? 'View and manage tickets assigned to you or created by you'
-            : 'Manage your support tickets with AI-powered assistance'
+            : 'Manage your tickets with AI-powered assistance'
           }
         </p>
       </div>

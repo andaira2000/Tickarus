@@ -210,7 +210,9 @@ class GitHubService:
     ) -> Dict:
         """Get detailed commit context for root cause analysis"""
         try:
-            commit_analysis = await self.analyze_recent_commits(full_name, failure_time)
+            commit_analysis = await self._analyze_recent_commits(
+                full_name, failure_time
+            )
 
             repo_context = await self._get_repository_context(full_name)
 
@@ -249,7 +251,6 @@ class GitHubService:
         repo_context: Dict,
         payload: GitHubWebhookPayload,
     ) -> str:
-        """Format CI failure into ticket description"""
         workflow_run = payload.workflow_run
 
         description = f"""## CI/CD Failure Report
@@ -284,7 +285,6 @@ class GitHubService:
         return description
 
     async def _get_key_files_structure(self, repo) -> List[Dict]:
-        """Get important files from repository"""
         key_files = []
         important_files = [
             "README.md",
@@ -315,7 +315,6 @@ class GitHubService:
         return key_files
 
     async def _get_workflow_logs(self, full_name: str, run_id: int) -> str:
-        """Get workflow logs from GitHub API."""
         try:
             async with httpx.AsyncClient(follow_redirects=True) as client:
                 headers = {
@@ -422,10 +421,9 @@ class GitHubService:
 
         return "Logs unavailable"
 
-    async def analyze_recent_commits(
+    async def _analyze_recent_commits(
         self, full_name: str, failure_time: datetime, max_commits: int = 50
     ) -> Dict:
-        """Analyze commits in the repository"""
         try:
             if not self.github_client:
                 return {"error": "GitHub client not available"}
@@ -444,18 +442,15 @@ class GitHubService:
             }
 
             for commit in commits:
-                commit_data = await self._analyze_single_commit(repo, commit)
+                commit_data = await self._analyze_single_commit(commit)
                 commit_analysis["commits"].append(commit_data)
 
-                # Track file changes
                 for file_info in commit_data.get("files", []):
                     commit_analysis["file_changes"][file_info["filename"]] += 1
 
-                # Track authors
                 if commit.author:
                     commit_analysis["authors"][commit.author.login] += 1
 
-                # Identify risk indicators
                 risk_indicators = self._identify_commit_risks(commit_data)
                 commit_analysis["risk_indicators"].extend(risk_indicators)
 
@@ -469,7 +464,6 @@ class GitHubService:
         try:
             repo = self.github_client.get_repo(full_name)
 
-            # Get recent commits
             commits = []
             for commit in islice(repo.get_commits(), 20):
                 commits.append(
@@ -492,7 +486,6 @@ class GitHubService:
                     }
                 )
 
-            # Get recent PRs
             open_prs = []
             for pr in islice(repo.get_pulls(state="all"), 20):
                 open_prs.append(
@@ -505,7 +498,6 @@ class GitHubService:
                     }
                 )
 
-            # Get recent issues
             recent_issues = []
             for issue in islice(repo.get_issues(state="all"), 20):
                 if not issue.pull_request:
@@ -520,10 +512,8 @@ class GitHubService:
                         }
                     )
 
-            # Get repository languages
             languages = repo.get_languages()
 
-            # Get key files structure
             key_files = await self._get_key_files_structure(repo)
 
             context = {
@@ -551,8 +541,7 @@ class GitHubService:
             logger.error(f"Unexpected error getting context for {full_name}: {e}")
             return {}
 
-    async def _analyze_single_commit(self, repo, commit) -> Dict:
-        """Analyze a single commit for potential issues"""
+    async def _analyze_single_commit(self, commit) -> Dict:
         try:
             commit_data = {
                 "sha": commit.sha[:8],
@@ -587,7 +576,6 @@ class GitHubService:
             return {"sha": commit.sha[:8], "error": str(e)}
 
     def _analyze_file_changes(self, file) -> Dict:
-        """Analyze code changes in a file for potential issues"""
         analysis = {
             "risk_level": "low",
             "issues": [],
@@ -610,11 +598,9 @@ class GitHubService:
             if line.startswith("-") and not line.startswith("---")
         ]
 
-        # Analyze added code for potential issues
         for line in added_lines:
             line = line.strip()
 
-            # Check for common problematic patterns
             if self._contains_security_risk(line):
                 analysis["issues"].append(f"Security risk: {line[:50]}...")
                 analysis["risk_level"] = "high"
@@ -624,12 +610,6 @@ class GitHubService:
                 if analysis["risk_level"] == "low":
                     analysis["risk_level"] = "medium"
 
-            elif self._contains_error_handling_issues(line):
-                analysis["issues"].append(f"Error handling issue: {line[:50]}...")
-                if analysis["risk_level"] == "low":
-                    analysis["risk_level"] = "medium"
-
-        # Large changes are riskier
         if file.changes > 100:
             analysis["issues"].append(f"Large change: {file.changes} lines modified")
             if analysis["risk_level"] == "low":
@@ -638,7 +618,6 @@ class GitHubService:
         return analysis
 
     def _analyze_commit_patterns(self, commits) -> Dict:
-        """Analyze patterns across multiple commits"""
         patterns = {
             "commit_frequency": len(commits),
             "message_patterns": [],
@@ -646,7 +625,6 @@ class GitHubService:
             "size_patterns": [],
         }
 
-        # Analyze commit messages for patterns
         urgent_keywords = [
             "fix",
             "hotfix",
@@ -684,14 +662,11 @@ class GitHubService:
         return patterns
 
     def _identify_commit_risks(self, commit_data: Dict) -> List[str]:
-        """Identify risk indicators in a commit"""
         risks = []
 
-        # Large commits are risky
         if commit_data["stats"]["total"] > 200:
             risks.append(f"Large commit: {commit_data['stats']['total']} lines changed")
 
-        # Check commit message for risk indicators
         message = commit_data["message"].lower()
         risky_phrases = [
             "quick fix",
@@ -710,7 +685,6 @@ class GitHubService:
             if phrase in message:
                 risks.append(f"Risky commit message pattern: '{phrase}'")
 
-        # Check for critical file modifications
         critical_files = 0
         for file_info in commit_data.get("files", []):
             if file_info.get("is_critical_file"):
@@ -722,7 +696,6 @@ class GitHubService:
         return risks
 
     def _detect_language(self, filename: str) -> str:
-        """Detect programming language from filename"""
         extensions = {
             ".py": "python",
             ".js": "javascript",
@@ -757,13 +730,10 @@ class GitHubService:
         return "unknown"
 
     def _is_critical_file(self, filename: str) -> bool:
-        """Check if a file is considered critical"""
         critical_patterns = [
-            # Config files
             r"\.env",
             r"config\.(py|js|json|yaml|yml)",
             r"settings\.(py|js)",
-            # Build/deployment files
             r"Dockerfile",
             r"docker-compose\.ya?ml",
             r"package\.json",
@@ -771,20 +741,16 @@ class GitHubService:
             r"Makefile",
             r"\.github/workflows/",
             r"\.gitlab-ci\.ya?ml",
-            # Database files
             r"migrations?/",
             r"schema\.(sql|py|js)",
             r"models\.(py|js)",
-            # Authentication/security
             r"auth\.(py|js)",
             r"security\.(py|js)",
             r"middleware\.(py|js)",
-            # Main application files
             r"main\.(py|js)",
             r"app\.(py|js)",
             r"server\.(py|js)",
             r"index\.(py|js|html)",
-            # Core business logic
             r"core/",
             r"services/",
             r"controllers/",
@@ -798,18 +764,17 @@ class GitHubService:
         return False
 
     def _contains_security_risk(self, line: str) -> bool:
-        """Check if code line contains security risks"""
         security_patterns = [
-            r'password\s*=\s*["\'][^"\']+["\']',  # Hardcoded passwords
-            r'secret\s*=\s*["\'][^"\']+["\']',  # Hardcoded secrets
-            r'api_?key\s*=\s*["\'][^"\']+["\']',  # Hardcoded API keys
-            r"exec\s*\(",  # Code execution
-            r"eval\s*\(",  # Code evaluation
-            r"subprocess\.",  # Subprocess calls
-            r"shell\s*=\s*True",  # Shell injection risk
-            r"\.innerHTML\s*=",  # XSS risk
-            r"document\.write\s*\(",  # XSS risk
-            r"sql.*\+.*\+",  # SQL injection risk
+            r'password\s*=\s*["\'][^"\']+["\']',
+            r'secret\s*=\s*["\'][^"\']+["\']',
+            r'api_?key\s*=\s*["\'][^"\']+["\']',
+            r"exec\s*\(",
+            r"eval\s*\(",
+            r"subprocess\.",
+            r"shell\s*=\s*True",
+            r"\.innerHTML\s*=",
+            r"document\.write\s*\(",
+            r"sql.*\+.*\+",
         ]
 
         for pattern in security_patterns:
@@ -819,16 +784,15 @@ class GitHubService:
         return False
 
     def _contains_performance_risk(self, line: str) -> bool:
-        """Check if code line contains performance risks"""
         performance_patterns = [
-            r"for.*in.*for.*in",  # Nested loops
-            r"while.*while",  # Nested while loops
-            r"\.sync\(",  # Synchronous calls
-            r"time\.sleep\(",  # Blocking sleep
-            r"\.all\(\)\.count\(\)",  # Inefficient database queries
-            r"SELECT \* FROM",  # SELECT * queries
-            r"setTimeout.*setTimeout",  # Nested timeouts
-            r"setInterval",  # Intervals
+            r"for.*in.*for.*in",
+            r"while.*while",
+            r"\.sync\(",
+            r"time\.sleep\(",
+            r"\.all\(\)\.count\(\)",
+            r"SELECT \* FROM",
+            r"setTimeout.*setTimeout",
+            r"setInterval",
         ]
 
         for pattern in performance_patterns:
@@ -837,27 +801,7 @@ class GitHubService:
 
         return False
 
-    def _contains_error_handling_issues(self, line: str) -> bool:
-        """Check if code line has error handling issues"""
-        error_patterns = [
-            r"except:?\s*$",  # Bare except
-            r"catch\s*\(\s*\)\s*\{",  # Empty catch
-            r"pass\s*$",  # Empty pass
-            r"// TODO",  # TODO comments
-            r"# TODO",  # TODO comments
-            r"console\.log\(",  # Debug logging
-            r"print\(",  # Debug printing
-            r'throw\s+new\s+Error\(\s*["\']["\']',  # Empty error messages
-        ]
-
-        for pattern in error_patterns:
-            if re.search(pattern, line, re.IGNORECASE):
-                return True
-
-        return False
-
     def _correlate_logs_with_commits(self, logs: str, commits: List[Dict]) -> Dict:
-        """Correlate failure logs with recent commits to find likely causes"""
         correlation = {
             "likely_culprits": [],
             "related_files": [],
@@ -880,9 +824,8 @@ class GitHubService:
             commit_score = 0
             matching_reasons = []
 
-            # Check if commit message relates to error
             commit_message = commit.get("message", "").lower()
-            for error_line in error_lines[:5]:  # Check first 5 error lines
+            for error_line in error_lines:
                 if any(
                     word in commit_message
                     for word in error_line.split()
@@ -893,7 +836,6 @@ class GitHubService:
                         f"Commit message relates to error: {error_line[:50]}..."
                     )
 
-            # Check if modified files appear in error logs
             for file_info in commit.get("files", []):
                 filename = file_info.get("filename", "")
                 if filename and filename.lower() in logs.lower():
@@ -903,7 +845,6 @@ class GitHubService:
                     )
                     correlation["related_files"].append(filename)
 
-            # Check for risky patterns
             if file_info.get("risk_level") == "high":
                 commit_score += 2
                 matching_reasons.append("High-risk code changes detected")
@@ -912,12 +853,11 @@ class GitHubService:
                 correlation["likely_culprits"].append(
                     {
                         "commit": commit,
-                        "confidence_score": min(commit_score * 10, 100),  # Cap at 100%
+                        "confidence_score": min(commit_score * 10, 100),
                         "reasons": matching_reasons,
                     }
                 )
 
-        # Sort by confidence score
         correlation["likely_culprits"].sort(
             key=lambda x: x["confidence_score"], reverse=True
         )
@@ -925,10 +865,8 @@ class GitHubService:
         return correlation
 
     def _assess_overall_risk(self, commit_analysis: Dict) -> Dict:
-        """Assess overall risk level based on commit analysis"""
         risk_assessment = {"level": "low", "score": 0, "factors": []}
 
-        # Repository commit activity analysis
         commit_count = commit_analysis.get("total_commits", 0)
         if commit_count > 50:
             risk_assessment["score"] += 2
@@ -941,12 +879,10 @@ class GitHubService:
                 f"Active repository: {commit_count} commits"
             )
 
-        # Risk indicators from individual commits
         risk_indicators = commit_analysis.get("risk_indicators", [])
         risk_assessment["score"] += len(risk_indicators)
         risk_assessment["factors"].extend(risk_indicators)
 
-        # Urgent/experimental commits
         patterns = commit_analysis.get("commit_patterns", {})
         urgent_commits = patterns.get("urgent_commits", 0)
         experimental_commits = patterns.get("experimental_commits", 0)
@@ -963,7 +899,6 @@ class GitHubService:
                 f"Experimental commits: {experimental_commits}"
             )
 
-        # Determine risk level
         if risk_assessment["score"] >= 8:
             risk_assessment["level"] = "high"
         elif risk_assessment["score"] >= 4:
@@ -974,10 +909,8 @@ class GitHubService:
     def _suggest_focus_areas(
         self, commit_analysis: Dict, correlation: Dict
     ) -> List[str]:
-        """Suggest areas to focus on for debugging"""
         suggestions = []
 
-        # Focus on likely culprit commits
         culprits = correlation.get("likely_culprits", [])
         if culprits:
             top_culprit = culprits[0]
@@ -986,7 +919,6 @@ class GitHubService:
                 f"(confidence: {top_culprit['confidence_score']}%)"
             )
 
-        # Focus on frequently changed files
         file_changes = commit_analysis.get("file_changes", {})
         if file_changes:
             most_changed = max(file_changes.items(), key=lambda x: x[1])
@@ -995,7 +927,6 @@ class GitHubService:
                     f"Focus on {most_changed[0]} (changed {most_changed[1]} times)"
                 )
 
-        # Focus on high-risk changes
         risk_indicators = commit_analysis.get("risk_indicators", [])
         high_risk_indicators = [
             r for r in risk_indicators if "high" in r.lower() or "critical" in r.lower()
@@ -1005,7 +936,6 @@ class GitHubService:
                 "Review high-risk changes: " + "; ".join(high_risk_indicators[:2])
             )
 
-        # Focus on recent large changes
         commits = commit_analysis.get("commits", [])
         large_commits = [c for c in commits if c.get("stats", {}).get("total", 0) > 100]
         if large_commits:
@@ -1013,25 +943,19 @@ class GitHubService:
                 f"Review large recent commits: {len(large_commits)} commits with >100 lines changed"
             )
 
-        return suggestions[:5]  # Return top 5 suggestions
+        return suggestions
 
     async def _get_full_repository_code(
         self, full_name: str, max_file_size: int = 50000
     ) -> Dict:
-        """
-        Fetch the complete repository code for LLM analysis
-        For dissertation purposes with small test repositories
-        """
         try:
             if not self.github_client:
                 return {"error": "GitHub client not available"}
 
             repo = self.github_client.get_repo(full_name)
 
-            # Get default branch
             default_branch = repo.default_branch
 
-            # Get the repository tree
             tree = repo.get_git_tree(default_branch, recursive=True)
 
             codebase = {
@@ -1043,7 +967,6 @@ class GitHubService:
                 "total_size": 0,
             }
 
-            # Filter to code files only
             code_extensions = {
                 ".py",
                 ".js",
@@ -1078,10 +1001,9 @@ class GitHubService:
                 ".conf",
             }
 
-            # Collect file information
             code_files = []
             for element in tree.tree:
-                if element.type == "blob":  # It's a file
+                if element.type == "blob":
                     file_path = element.path
                     file_ext = (
                         "." + file_path.split(".")[-1].lower()
@@ -1094,7 +1016,6 @@ class GitHubService:
                         name in file_path.lower()
                         for name in ["makefile", "dockerfile", "readme", "license"]
                     ):
-
                         code_files.append(
                             {
                                 "path": file_path,
@@ -1104,21 +1025,18 @@ class GitHubService:
                             }
                         )
 
-            # Sort by importance (critical files first)
             code_files.sort(
                 key=lambda f: self._get_file_importance_score(f["path"]), reverse=True
             )
 
-            # Fetch content for files (with size limits for LLM)
             total_content_size = 0
-            max_total_size = 200000  # 200KB total limit for LLM context
+            max_total_size = 200000
 
             for file_info in code_files:
                 if total_content_size >= max_total_size:
                     break
 
                 if file_info["size"] > max_file_size:
-                    # For large files, just show structure
                     codebase["files"][file_info["path"]] = {
                         "content": f"[File too large: {file_info['size']} bytes]",
                         "size": file_info["size"],
@@ -1128,7 +1046,6 @@ class GitHubService:
                     continue
 
                 try:
-                    # Fetch file content
                     file_content = repo.get_contents(file_info["path"])
 
                     if file_content.content:
@@ -1136,9 +1053,7 @@ class GitHubService:
                             "utf-8", errors="ignore"
                         )
 
-                        # Add to total size check
                         if total_content_size + len(decoded_content) > max_total_size:
-                            # Truncate if it would exceed limit
                             remaining_space = max_total_size - total_content_size
                             decoded_content = (
                                 decoded_content[:remaining_space] + "\n[TRUNCATED]"
@@ -1165,7 +1080,6 @@ class GitHubService:
                         "error": str(e),
                     }
 
-            # Create directory structure
             codebase["structure"] = self._build_directory_structure(
                 codebase["files"].keys()
             )
@@ -1182,7 +1096,6 @@ class GitHubService:
             return {"error": str(e)}
 
     def _get_file_importance_score(self, file_path: str) -> int:
-        """Score files by importance for root cause analysis"""
         score = 0
 
         # Critical configuration files
@@ -1231,7 +1144,6 @@ class GitHubService:
         return score
 
     def _build_directory_structure(self, file_paths) -> List[str]:
-        """Build a simple directory structure representation"""
         directories = set()
 
         for path in file_paths:

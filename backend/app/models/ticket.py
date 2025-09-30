@@ -41,7 +41,7 @@ class TicketCreate(BaseModel):
 
 
 class TicketUpdate(BaseModel):
-    team_id: Optional[UUID] = None
+    team_id: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
     status: Optional[TicketStatus] = None

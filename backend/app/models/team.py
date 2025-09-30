@@ -25,16 +25,16 @@ class TeamUpdate(BaseModel):
 
 
 class Team(TeamBase, BaseDBModel):
-    created_by: UUID  # Keep as direct reference to profiles (humans only)
+    # Hydrated fields
+    created_by: UUID
     members_count: Optional[int] = 0
-    # profile info for display
-    creator_info: Optional[dict] = None  # Will be populated with profile data
+    creator_info: Optional[dict] = None
 
 
 class TeamMember(BaseModel):
+    # Hydrated fields
     team_id: UUID
-    user_id: UUID  # Keep as direct reference to profiles (humans only)
+    user_id: UUID
     role: TeamRole = TeamRole.MEMBER
     joined_at: Optional[str] = None
-    # profile info for display
-    member_info: Optional[dict] = None  # Will be populated with profile data
+    member_info: Optional[dict] = None

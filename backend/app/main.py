@@ -13,7 +13,7 @@ from app.api.routes import (
     github,
     # metrics,
     tags,
-    # teams,
+    teams,
     tickets,
 )
 from app.db.database import init_supabase_service_client
@@ -89,7 +89,7 @@ async def health_check():
 
 
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
-# app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
+app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 app.include_router(tickets.router, prefix="/api/tickets", tags=["tickets"])
 app.include_router(comments.router, prefix="/api/comments", tags=["comments"])
 app.include_router(tags.router, prefix="/api/tags", tags=["tags"])

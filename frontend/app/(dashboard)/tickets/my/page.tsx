@@ -195,7 +195,6 @@ function MyTicketsContent() {
         </p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card className="shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="pb-2">
@@ -231,7 +230,6 @@ function MyTicketsContent() {
         </Card>
       </div>
 
-      {/* Tickets Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="created">Created by Me</TabsTrigger>

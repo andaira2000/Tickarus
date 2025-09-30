@@ -28,15 +28,15 @@ export function getActorDisplayName(actor: ActorInfo): string {
 export function getSystemUserIcon(systemUserType: SystemUserType): string {
   switch (systemUserType) {
     case 'ci_automation':
-      return '🔧'; // wrench for CI
+      return '🔧';
     case 'ai_assistant':
-      return '🤖'; // robot for AI
+      return '🤖';
     case 'data_processor':
-      return '📊'; // chart for data processing
+      return '📊';
     case 'notification_service':
-      return '📢'; // megaphone for notifications
+      return '📢';
     default:
-      return '⚙️'; // gear for generic system
+      return '⚙️';
   }
 }
 

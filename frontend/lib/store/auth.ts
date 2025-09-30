@@ -27,7 +27,6 @@ export const useAuthStore = create<AuthState>()(
         try {
           await apiClient.login(email, password);
           
-          // Get user profile
           const user = await apiClient.getCurrentUser();
           
           set({
@@ -55,7 +54,7 @@ export const useAuthStore = create<AuthState>()(
           
           set({
             user,
-            isAuthenticated: false, // User needs to confirm email
+            isAuthenticated: false,
             isLoading: false,
           });
         } catch (error) {
@@ -78,7 +77,6 @@ export const useAuthStore = create<AuthState>()(
         const token = localStorage.getItem('access_token');
         if (token) {
           try {
-            // Verify the token and get user data
             const user = await apiClient.getCurrentUser();
             set({ 
               user, 
@@ -86,7 +84,6 @@ export const useAuthStore = create<AuthState>()(
               isInitialized: true 
             });
           } catch {
-            // Token is invalid
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
             set({ 

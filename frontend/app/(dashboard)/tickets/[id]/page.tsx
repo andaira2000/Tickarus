@@ -169,7 +169,6 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
 
   return (
     <>
-      {/* Header */}
       <div className="mb-6">
         <Button
           variant="ghost"
@@ -200,9 +199,7 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Description */}
           <Card className="shadow-md">
             <CardHeader>
               <CardTitle>Description</CardTitle>
@@ -214,7 +211,6 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
             </CardContent>
           </Card>
 
-          {/* Tags */}
           {ticket.tags && ticket.tags.length > 0 && (
             <Card className="shadow-md">
               <CardHeader>
@@ -236,7 +232,6 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
             </Card>
           )}
 
-          {/* Comments */}
           <Card className="shadow-md">
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -269,49 +264,44 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
                         <div className="text-sm text-gray-700 leading-relaxed text-justify px-2" style={{ textAlignLast: 'left' }}>
                           {(() => {
                             let processedContent = comment.content
-                              .replace(/[🎯📋🔍💡✅❌⚠️🚀📊🔧⭐🤖🟢🟡🔴]/g, '') // Remove common emojis including robot and colored circles
-                              .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '') // Remove all emojis
-                              .replace(/(?:^|\n)\s*(?:\*\*)?AI Root Cause Analysis(?:\*\*)?\s*(?:\n|$)/gi, '\n') // Remove AI Root Cause Analysis header
-                              .replace(/(?:^|\n)\s*(?:\*\*)?Root Cause Analysis(?:\*\*)?\s*(?:\n|$)/gi, '\n') // Remove Root Cause Analysis header
-                              .replace(/---.*?Analysis method:.*?(?:\n|$)/gi, '') // Remove analysis method line
-                              .replace(/.*?Analysis method:.*?(?:\n|$)/gi, '') // Remove analysis method line (alternative format)
-                              .replace(/^\s*---+\s*$/gm, '') // Remove standalone dashes
-                              .replace(/^\s*---.*$/gm, '') // Remove lines starting with ---
-                              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Convert ** to HTML bold
-                              .replace(/#{1,6}\s(.*?)(?=\n|$)/g, '<strong>$1</strong>') // Convert headers to bold
-                              .replace(/^\s*[-*+]\s(.+)/gm, '<p class="mb-2">• $1</p>') // Convert bullet points to separate paragraphs
-                              .replace(/^\s*(\d+)\.\s(.+)/gm, '<p class="mb-2">$1. $2</p>') // Convert numbered lists to separate paragraphs
-                              .replace(/`([^`]+)`/g, '$1') // Remove code formatting
-                              .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Convert links to text only
-                              .replace(/\n\n+/g, '\n\n') // Normalize paragraph breaks
+                              .replace(/[🎯📋🔍💡✅❌⚠️🚀📊🔧⭐🤖🟢🟡🔴]/g, '')
+                              .replace(/[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '')
+                              .replace(/(?:^|\n)\s*(?:\*\*)?AI Root Cause Analysis(?:\*\*)?\s*(?:\n|$)/gi, '\n')
+                              .replace(/(?:^|\n)\s*(?:\*\*)?Root Cause Analysis(?:\*\*)?\s*(?:\n|$)/gi, '\n')
+                              .replace(/---.*?Analysis method:.*?(?:\n|$)/gi, '')
+                              .replace(/.*?Analysis method:.*?(?:\n|$)/gi, '')
+                              .replace(/^\s*---+\s*$/gm, '')
+                              .replace(/^\s*---.*$/gm, '')
+                              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                              .replace(/#{1,6}\s(.*?)(?=\n|$)/g, '<strong>$1</strong>')
+                              .replace(/^\s*[-*+]\s(.+)/gm, '<p class="mb-2">• $1</p>')
+                              .replace(/^\s*(\d+)\.\s(.+)/gm, '<p class="mb-2">$1. $2</p>')
+                              .replace(/`([^`]+)`/g, '$1') 
+                              .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+                              .replace(/\n\n+/g, '\n\n')
                               .trim();
 
-                            // Extract confidence level if present
                             const confidenceMatch = processedContent.match(/(?:^|\n)\s*(?:\*\*)?Confidence Level:?\s*([^(\n]*?)(?:\s*\(([^)]+)\))?(?:\n|$)/i);
                             let confidenceLevel = null;
                             if (confidenceMatch) {
                               const level = confidenceMatch[1].trim();
                               const percentage = confidenceMatch[2] ? confidenceMatch[2].trim() : null;
 
-                              // Format the confidence level like "High (90%)" or just "High" if no percentage
                               if (percentage) {
                                 confidenceLevel = `${level} (${percentage.replace('%', '')}%)`;
                               } else {
                                 confidenceLevel = level;
                               }
 
-                              // Remove confidence level from main content
                               processedContent = processedContent.replace(/(?:^|\n)\s*(?:\*\*)?Confidence Level:?.*?(?:\n|$)/gi, '\n');
                             }
 
-                            // Process the main content
                             const mainContent = processedContent
                               .split('\n\n')
                               .map(paragraph => paragraph.trim())
                               .filter(paragraph => paragraph.length > 0)
-                              .filter(paragraph => !paragraph.match(/^<p class="mb-2">/)) // Filter out list items that were already processed
+                              .filter(paragraph => !paragraph.match(/^<p class="mb-2">/)) 
                               .map(paragraph => {
-                                // Skip paragraphs that are already processed list items
                                 if (paragraph.includes('<p class="mb-2">')) {
                                   return paragraph;
                                 }
@@ -378,7 +368,6 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
 
               <Separator className="my-6" />
 
-              {/* Add Comment Form */}
               <Form {...commentForm}>
                 <form onSubmit={commentForm.handleSubmit(onCommentSubmit)} className="space-y-4">
                   <FormField
@@ -411,9 +400,7 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
           </Card>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-6 sticky top-6 self-start max-h-[calc(100vh-8rem)] overflow-y-auto">
-          {/* Status, Priority, and Team */}
           <Card className="shadow-md">
             <CardContent className="p-5">
               <div className="space-y-4">
@@ -478,7 +465,6 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
             </CardContent>
           </Card>
 
-          {/* Ticket Info */}
           <Card className="shadow-md">
             <CardContent className="space-y-3 p-6">
               <div className="grid grid-cols-2 gap-4 text-sm">
@@ -527,10 +513,7 @@ function TicketDetailContent({ ticketId }: { ticketId: string }) {
             </CardContent>
           </Card>
 
-          {/* AI Analysis */}
           <AIAnalysis ticketId={ticketId} />
-
-          {/* AI Chat */}
           <AIChat ticketId={ticketId} />
         </div>
       </div>

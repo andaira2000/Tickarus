@@ -93,7 +93,6 @@ function CreateTicketContent() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main form */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
@@ -246,15 +245,12 @@ function CreateTicketContent() {
           </Card>
         </div>
 
-        {/* AI Features Sidebar */}
         <div className="space-y-6">
-          {/* Similarity Suggestions */}
           <SimilaritySuggestions
             title={form.watch('title') || ''}
             description={form.watch('description') || ''}
           />
 
-          {/* Auto-Tagging Suggestions */}
           <AutoTaggingSuggestions
             title={form.watch('title') || ''}
             description={form.watch('description') || ''}

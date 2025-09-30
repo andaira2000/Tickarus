@@ -28,7 +28,6 @@ function TicketsContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 15;
 
-  // Debounce search query - update debouncedSearchQuery after 1.5s of no typing
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
@@ -37,7 +36,6 @@ function TicketsContent() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Build filters for API calls
   const buildFilters = (extraFilters = {}) => ({
     page: currentPage,
     page_size: pageSize,
@@ -47,14 +45,12 @@ function TicketsContent() {
     ...extraFilters,
   });
 
-  // Fetch all tickets
   const { data: allTicketsData, isLoading: isLoadingAll } = useQuery({
     queryKey: ['tickets', 'all', currentPage, debouncedSearchQuery, statusFilter, priorityFilter],
     queryFn: () => apiClient.getTickets(buildFilters()),
     enabled: activeTab === 'all',
   });
 
-  // Fetch my tickets
   const { data: myCreatedTickets, isLoading: isLoadingCreated } = useQuery({
     queryKey: ['tickets', 'created', user?.id, currentPage, debouncedSearchQuery, statusFilter, priorityFilter],
     queryFn: () => apiClient.getTickets(buildFilters({
@@ -71,10 +67,8 @@ function TicketsContent() {
     enabled: !!user?.id && activeTab === 'my',
   });
 
-  // Get current data based on active tab
   const currentData = useMemo(() => {
     if (activeTab === 'my') {
-      // For my tickets, we'll use the created tickets as primary and show stats
       return myCreatedTickets;
     }
     return allTicketsData;
@@ -84,22 +78,20 @@ function TicketsContent() {
     return currentData?.tickets || [];
   }, [currentData]);
 
-  // Apply client-side sorting since API doesn't support sorting parameters
   const filteredAndSortedTickets = useMemo(() => {
     const sorted = [...currentTickets].sort((a, b) => {
       const dateA = new Date(a.created_at).getTime();
       const dateB = new Date(b.created_at).getTime();
 
       if (sortOrder === 'desc') {
-        return dateB - dateA; // Newest first
+        return dateB - dateA;
       } else {
-        return dateA - dateB; // Oldest first
+        return dateA - dateB;
       }
     });
     return sorted;
   }, [currentTickets, sortOrder]);
 
-  // Calculate counts (fetch totals without filters for accurate counts)
   const { data: allTicketsCount } = useQuery({
     queryKey: ['tickets', 'count', 'all'],
     queryFn: () => apiClient.getTickets({ page: 1, page_size: 1 }),
@@ -117,7 +109,6 @@ function TicketsContent() {
     return { all: allCount, my: myCount };
   }, [allTicketsCount, myTicketsCount]);
 
-  // Status counts for current view
   const statusCounts = useMemo(() => {
     const counts = filteredAndSortedTickets.reduce((acc, ticket) => {
       acc[ticket.status] = (acc[ticket.status] || 0) + 1;
@@ -134,7 +125,6 @@ function TicketsContent() {
     };
   }, [filteredAndSortedTickets]);
 
-  // My tickets stats (for My Tickets view)
   const myTicketStats = useMemo(() => {
     if (activeTab !== 'my') return null;
 
@@ -158,7 +148,6 @@ function TicketsContent() {
     setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
   };
 
-  // Reset to page 1 when filters change
   const handleFilterChange = (newFilters: {
     searchQuery?: string;
     statusFilter?: string;
@@ -170,7 +159,6 @@ function TicketsContent() {
     if (newFilters.priorityFilter !== undefined) setPriorityFilter(newFilters.priorityFilter);
   };
 
-  // Handle immediate search on Enter key press
   const handleSearchKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       setDebouncedSearchQuery(searchQuery);
@@ -178,13 +166,11 @@ function TicketsContent() {
     }
   }, [searchQuery]);
 
-  // Reset to page 1 when tab changes
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
     setCurrentPage(1);
   };
 
-  // Pagination calculations
   const totalPages = Math.ceil((currentData?.total || 0) / pageSize);
   const hasNextPage = currentPage < totalPages;
   const hasPrevPage = currentPage > 1;
@@ -247,7 +233,6 @@ function TicketsContent() {
         </p>
       </div>
 
-      {/* Tab Navigation */}
       <div className="mb-8">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full max-w-md grid-cols-2">
@@ -269,10 +254,8 @@ function TicketsContent() {
         </Tabs>
       </div>
 
-      {/* My Tickets Stats */}
       {activeTab === 'my' && myTicketStats && (
         <div className="space-y-6 mb-8">
-          {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -319,7 +302,6 @@ function TicketsContent() {
             </Card>
           </div>
 
-          {/* Priority and Status Overview */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <CardHeader>
@@ -379,7 +361,6 @@ function TicketsContent() {
         </div>
       )}
 
-      {/* Status Count Badges */}
       <div className="flex flex-wrap gap-4 mb-6">
         <Badge variant="outline" className="px-3 py-1">
           All: {statusCounts.all}
@@ -401,7 +382,6 @@ function TicketsContent() {
         </Badge>
       </div>
 
-      {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
@@ -462,12 +442,10 @@ function TicketsContent() {
         </div>
       </div>
 
-      {/* Results count */}
       <div className="text-sm text-muted-foreground mb-6">
         Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, currentData?.total || 0)} of {currentData?.total || 0} tickets
       </div>
 
-      {/* Tickets List */}
       <div className="space-y-4">
         {filteredAndSortedTickets.length === 0 ? (
           <div className="text-center py-12">
@@ -513,14 +491,11 @@ function TicketsContent() {
                   </div>
                 </div>
 
-                {/* Main content */}
                 <div className="space-y-4">
-                  {/* Description */}
                   <p className="text-gray-600 line-clamp-2 leading-relaxed">
                     {ticket.description}
                   </p>
 
-                  {/* Tags */}
                   {ticket.tags && ticket.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {ticket.tags.slice(0, 3).map((tag) => (
@@ -538,7 +513,6 @@ function TicketsContent() {
                   )}
                 </div>
 
-                {/* Meta information */}
                 <div className="flex items-center gap-4 text-sm text-gray-500 pt-4 mt-4 border-t border-gray-100 bg-gray-50/50 -mx-4 px-4 pb-4">
                   <div className="flex items-center gap-1">
                     <User className="w-4 h-4" />
@@ -559,7 +533,6 @@ function TicketsContent() {
         )}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-8">
           <div className="text-sm text-muted-foreground">
@@ -576,13 +549,11 @@ function TicketsContent() {
               Previous
             </Button>
 
-            {/* Page numbers */}
             <div className="flex items-center gap-1">
               {(() => {
                 const pages = [];
 
                 if (totalPages <= 7) {
-                  // Show all pages if 7 or fewer
                   for (let i = 1; i <= totalPages; i++) {
                     pages.push(
                       <Button
@@ -597,7 +568,6 @@ function TicketsContent() {
                     );
                   }
                 } else {
-                  // Always show first page
                   pages.push(
                     <Button
                       key={1}
@@ -610,7 +580,6 @@ function TicketsContent() {
                     </Button>
                   );
 
-                  // Show ellipsis if current page is far from start
                   if (currentPage > 4) {
                     pages.push(
                       <span key="ellipsis1" className="px-2 text-gray-400">
@@ -619,7 +588,6 @@ function TicketsContent() {
                     );
                   }
 
-                  // Show pages around current page
                   const start = Math.max(2, currentPage - 1);
                   const end = Math.min(totalPages - 1, currentPage + 1);
 
@@ -637,7 +605,6 @@ function TicketsContent() {
                     );
                   }
 
-                  // Show ellipsis if current page is far from end
                   if (currentPage < totalPages - 3) {
                     pages.push(
                       <span key="ellipsis2" className="px-2 text-gray-400">
@@ -646,7 +613,6 @@ function TicketsContent() {
                     );
                   }
 
-                  // Always show last page
                   pages.push(
                     <Button
                       key={totalPages}

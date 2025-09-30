@@ -31,7 +31,6 @@ class ApiClient {
   });
 
   constructor() {
-    // Request interceptor to add auth token
     this.client.interceptors.request.use((config) => {
       const token = localStorage.getItem('access_token');
       if (token) {
@@ -40,7 +39,6 @@ class ApiClient {
       return config;
     });
 
-    // Response interceptor to handle auth errors
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
@@ -54,7 +52,6 @@ class ApiClient {
     );
   }
 
-  // Auth endpoints
   async register(email: string, password: string, full_name?: string) {
     const response = await this.client.post<{ user_id: string; email: string }>('/api/auth/register', {
       email,
@@ -70,7 +67,7 @@ class ApiClient {
       password,
     });
     
-    // Store tokens
+
     localStorage.setItem('access_token', response.data.access_token);
     localStorage.setItem('refresh_token', response.data.refresh_token);
     
@@ -82,7 +79,6 @@ class ApiClient {
     return response.data;
   }
 
-  // Teams endpoints
   async getTeams() {
     const response = await this.client.get<Team[]>('/api/teams');
     return response.data;
@@ -120,7 +116,6 @@ class ApiClient {
     await this.client.delete(`/api/teams/${teamId}/members/${userId}`);
   }
 
-  // Tickets endpoints
   async getTickets(filters: TicketFilters = {}) {
     const params = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => {
@@ -168,7 +163,6 @@ class ApiClient {
     await this.client.delete(`/api/tickets/${ticketId}/watch`);
   }
 
-  // Comments endpoints
   async getComments(ticketId: string) {
     const response = await this.client.get<Comment[]>(`/api/comments/ticket/${ticketId}`);
     return response.data;
@@ -193,7 +187,6 @@ class ApiClient {
     await this.client.delete(`/api/comments/${commentId}`);
   }
 
-  // Tags endpoints
   async getTags() {
     const response = await this.client.get<Tag[]>('/api/tags');
     return response.data;
@@ -209,7 +202,6 @@ class ApiClient {
     return response.data;
   }
 
-  // System Users endpoints
   async getSystemUsers() {
     const response = await this.client.get<SystemUser[]>('/api/system-users');
     return response.data;
@@ -220,7 +212,6 @@ class ApiClient {
     return response.data;
   }
 
-  // AI Chat endpoints
   async createChatSession(sessionData: ChatSessionCreate) {
     const response = await this.client.post<ChatSession>('/api/ai-chat/sessions', sessionData);
     return response.data;
@@ -255,7 +246,6 @@ class ApiClient {
     return response.data;
   }
 
-  // AI Features endpoints
   async findSimilarTickets(ticketText: string, limit = 5) {
     const response = await this.client.post<Array<{
       id: string;

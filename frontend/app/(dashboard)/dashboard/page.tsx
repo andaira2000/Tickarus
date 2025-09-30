@@ -58,7 +58,7 @@ function DashboardContent() {
     },
     {
       name: 'Resolved Today',
-      value: 12, // This would come from analytics
+      value: 12,
       icon: CheckCircle,
       change: '+25%',
       changeType: 'positive',
@@ -106,7 +106,6 @@ function DashboardContent() {
         </p>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         {stats.map((stat) => (
           <Card key={stat.name} className="shadow-md hover:shadow-lg transition-shadow">
@@ -132,7 +131,6 @@ function DashboardContent() {
         ))}
       </div>
 
-      {/* Recent Tickets */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="shadow-md">
           <CardHeader>

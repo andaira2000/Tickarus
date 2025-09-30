@@ -29,11 +29,10 @@ interface SimilaritySuggestionsProps {
 export function SimilaritySuggestions({ title, description, className }: SimilaritySuggestionsProps) {
   const [debouncedText, setDebouncedText] = useState('');
 
-  // Debounce the input to avoid too many API calls
   useEffect(() => {
     const timer = setTimeout(() => {
       const combinedText = `${title} ${description}`.trim();
-      if (combinedText.length > 1) { // Only search if we have meaningful content
+      if (combinedText.length > 1) {
         setDebouncedText(combinedText);
       } else {
         setDebouncedText('');
@@ -43,12 +42,11 @@ export function SimilaritySuggestions({ title, description, className }: Similar
     return () => clearTimeout(timer);
   }, [title, description]);
 
-  // Query similar tickets
   const { data: similarTickets, isLoading, error } = useQuery({
     queryKey: ['similar-tickets', debouncedText],
     queryFn: () => apiClient.findSimilarTickets(debouncedText, 5),
     enabled: debouncedText.length > 0,
-    staleTime: 30000, // Cache for 30 seconds
+    staleTime: 30000,
   });
 
   const formatStatus = (status: TicketStatus) => {
@@ -75,9 +73,9 @@ export function SimilaritySuggestions({ title, description, className }: Similar
   };
 
   const getSimilarityColor = (score: number) => {
-    if (score >= 0.8) return 'text-red-600'; // Very similar - potential duplicate
-    if (score >= 0.6) return 'text-orange-600'; // Quite similar
-    return 'text-blue-600'; // Somewhat similar
+    if (score >= 0.8) return 'text-red-600';
+    if (score >= 0.6) return 'text-orange-600'; 
+    return 'text-blue-600'; 
   };
 
   const getSimilarityLabel = (score: number) => {

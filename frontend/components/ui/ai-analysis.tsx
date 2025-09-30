@@ -30,15 +30,13 @@ export function AIAnalysis({ ticketId, className }: AIAnalysisProps) {
   const [userRating, setUserRating] = useState<'helpful' | 'not_helpful' | null>(null);
   const queryClient = useQueryClient();
 
-  // Query AI analysis
   const { data: analysis, isLoading, error, refetch } = useQuery({
     queryKey: ['ai-analysis', ticketId],
     queryFn: () => apiClient.getAIRootCauseAnalysis(ticketId),
     enabled: isExpanded,
-    staleTime: 300000, // Cache for 5 minutes
+    staleTime: 300000,
   });
 
-  // Rate analysis mutation
   const rateAnalysisMutation = useMutation({
     mutationFn: (rating: 'helpful' | 'not_helpful') =>
       apiClient.rateAIAnalysis(ticketId, rating),

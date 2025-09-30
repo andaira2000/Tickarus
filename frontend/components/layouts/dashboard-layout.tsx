@@ -56,7 +56,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const { user, isAuthenticated, isInitialized, logout } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(() => {
-    // Initialize from localStorage if available, default to true
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('sidebar-open');
       return stored !== null ? JSON.parse(stored) : true;
@@ -64,15 +63,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     return true;
   });
 
-  // More precise path matching function
   const isPathActive = (href: string) => {
     if (pathname === href) return true;
-    
-    // Special handling for tickets routes
+
     if (href === '/tickets' && pathname === '/tickets/my') return false;
     if (href === '/tickets/my' && pathname === '/tickets') return false;
-    
-    // General sub-path matching (but not for tickets)
+
     if (href !== '/tickets' && pathname.startsWith(href + '/')) return true;
     
     return false;
@@ -92,13 +88,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const toggleSidebar = () => {
     const newState = !sidebarOpen;
     setSidebarOpen(newState);
-    // Persist to localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('sidebar-open', JSON.stringify(newState));
     }
   };
 
-  // Show loading spinner while auth is initializing
   if (!isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -111,15 +105,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   if (!isAuthenticated) {
-    return null; // This will only show briefly before redirect
+    return null;
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Sidebar */}
       <div className={`fixed inset-y-0 z-50 flex ${sidebarOpen ? 'w-64' : 'w-16'} flex-col transition-all duration-300 ease-in-out`}>
         <div className={`flex grow flex-col gap-y-5 overflow-y-auto bg-white py-4 shadow-sm ${sidebarOpen ? 'px-6' : 'px-2'} transition-all duration-300`}>
-          {/* Logo and Toggle */}
           <div className={`flex h-16 shrink-0 items-center ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
             {sidebarOpen && (
               <h1 className="text-2xl font-bold text-teal-600 text-center">Tickarus</h1>
@@ -133,7 +125,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </Button>
           </div>
 
-          {/* Create Ticket Button */}
           <Link href="/tickets/new">
             <Button className={`w-full ${sidebarOpen ? 'justify-start gap-x-3' : 'justify-center'} p-2 text-sm leading-6 font-semibold`}>
               <Plus className="h-6 w-6 shrink-0" />
@@ -141,7 +132,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </Button>
           </Link>
 
-          {/* Navigation */}
           <nav className="flex flex-1 flex-col">
             <ul role="list" className="flex flex-1 flex-col gap-y-7">
               <li>
@@ -177,7 +167,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </ul>
           </nav>
 
-          {/* User Profile */}
           <div className="mt-auto">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -213,7 +202,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
       </div>
 
-      {/* Main content */}
       <div className={`${sidebarOpen ? 'pl-64' : 'pl-16'} transition-all duration-300 ease-in-out`}>
         <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
           <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">

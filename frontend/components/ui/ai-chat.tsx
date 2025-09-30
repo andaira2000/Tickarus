@@ -40,14 +40,12 @@ export function AIChat({ ticketId, className }: AIChatProps) {
     },
   });
 
-  // Query existing chat sessions for this ticket
   const { data: sessions } = useQuery({
     queryKey: ['chat-sessions', ticketId],
     queryFn: () => apiClient.getTicketChatSessions(ticketId),
     enabled: isExpanded,
   });
 
-  // Query messages for current session
   const { data: sessionData, isLoading: messagesLoading } = useQuery({
     queryKey: ['chat-session', currentSession?.id],
     queryFn: () => currentSession ? apiClient.getChatSession(currentSession.id) : null,
@@ -56,7 +54,6 @@ export function AIChat({ ticketId, className }: AIChatProps) {
 
   const messages = sessionData?.messages || [];
 
-  // Create new chat session
   const createSessionMutation = useMutation({
     mutationFn: (initialMessage?: string) =>
       apiClient.createChatSession({
@@ -67,7 +64,6 @@ export function AIChat({ ticketId, className }: AIChatProps) {
       setCurrentSession(session);
       queryClient.invalidateQueries({ queryKey: ['chat-sessions', ticketId] });
       if (!form.getValues().content) {
-        // Only clear if we sent the initial message
         form.reset();
       }
     },
@@ -76,7 +72,6 @@ export function AIChat({ ticketId, className }: AIChatProps) {
     },
   });
 
-  // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: ({ sessionId, messageData }: { sessionId: string; messageData: ChatMessageCreate }) =>
       apiClient.sendChatMessage(sessionId, messageData),
@@ -91,10 +86,8 @@ export function AIChat({ ticketId, className }: AIChatProps) {
 
   const onSubmit = (data: MessageFormData) => {
     if (!currentSession) {
-      // Create new session with initial message
       createSessionMutation.mutate(data.content);
     } else {
-      // Send message to existing session
       sendMessageMutation.mutate({
         sessionId: currentSession.id,
         messageData: { content: data.content, role: 'user' },
@@ -111,12 +104,10 @@ export function AIChat({ ticketId, className }: AIChatProps) {
     setCurrentSession(session);
   };
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Auto-select the most recent session if available
   useEffect(() => {
     if (!currentSession && sessions && sessions.length > 0) {
       setCurrentSession(sessions[0]);
@@ -198,7 +189,6 @@ export function AIChat({ ticketId, className }: AIChatProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Session selector */}
         {sessions && sessions.length > 1 && (
           <div className="flex flex-wrap gap-2">
             {sessions.slice(0, 3).map((session) => (
@@ -215,7 +205,6 @@ export function AIChat({ ticketId, className }: AIChatProps) {
           </div>
         )}
 
-        {/* Messages */}
         <div className="space-y-3 max-h-80 overflow-y-auto">
           {messagesLoading ? (
             <div className="flex items-center justify-center py-4">
@@ -269,7 +258,6 @@ export function AIChat({ ticketId, className }: AIChatProps) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Message input */}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
             <FormField

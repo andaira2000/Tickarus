@@ -32,13 +32,12 @@ export function AutoTaggingSuggestions({
   const [debouncedText, setDebouncedText] = useState('');
   const [appliedSuggestions, setAppliedSuggestions] = useState(false);
 
-  // Debounce the input to avoid too many API calls
   useEffect(() => {
     const timer = setTimeout(() => {
       const combinedText = `${title} ${description}`.trim();
       if (combinedText.length > 10) {
         setDebouncedText(combinedText);
-        setAppliedSuggestions(false); // Reset when text changes
+        setAppliedSuggestions(false);
       } else {
         setDebouncedText('');
       }
@@ -47,12 +46,11 @@ export function AutoTaggingSuggestions({
     return () => clearTimeout(timer);
   }, [title, description]);
 
-  // Query auto-tagging suggestions
   const { data: suggestions, isLoading, error } = useQuery({
     queryKey: ['auto-tagging', debouncedText],
     queryFn: () => apiClient.getAutoTaggingSuggestions(title, description),
     enabled: debouncedText.length > 0,
-    staleTime: 60000, // Cache for 1 minute
+    staleTime: 60000,
   });
 
   const handleApplyTags = () => {

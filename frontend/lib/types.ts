@@ -1,4 +1,3 @@
-// API Response Types
 export interface User {
   id: string;
   email: string;
@@ -29,7 +28,7 @@ export interface ActorInfo {
   display_name: string;
   avatar_url?: string;
   is_system: boolean;
-  system_user_type?: SystemUserType; // Only for system actors
+  system_user_type?: SystemUserType;
 }
 
 export interface AuthResponse {
@@ -64,14 +63,13 @@ export interface Ticket {
   status: TicketStatus;
   priority: TicketPriority;
   assignee_id?: string;
-  actor_id: string; // Reference to actors table
+  actor_id: string;
   created_at: string;
   updated_at?: string;
   last_activity_at?: string;
   tags?: string[];
   comment_count?: number;
   team_name?: string;
-  // populated by hydration - creator info from actor
   creator_info?: ActorInfo;
 }
 
@@ -104,10 +102,9 @@ export interface Comment {
   id: string;
   ticket_id: string;
   content: string;
-  actor_id: string; // Reference to actors table
+  actor_id: string;
   created_at: string;
   updated_at?: string;
-  // populated by hydration - author info from actor
   author_info?: ActorInfo;
 }
 
@@ -131,7 +128,6 @@ export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
 
 export type TeamRole = 'manager' | 'member';
 
-// Filter types
 export interface TicketFilters {
   team_id?: string;
   status?: TicketStatus;
@@ -145,7 +141,6 @@ export interface TicketFilters {
   created_by_me?: boolean;
 }
 
-// AI Chat Types
 export interface ChatSession {
   id: string;
   ticket_id: string;

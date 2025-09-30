@@ -9,7 +9,7 @@ from app.api.routes import (
     ai_chat,
     auth,
     comments,
-    # evaluation,
+    evaluation,
     github,
     # metrics,
     tags,
@@ -96,4 +96,4 @@ app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
 app.include_router(github.router, prefix="/api", tags=["github"])
 # app.include_router(metrics.router, prefix="/api/metrics", tags=["metrics"])
 app.include_router(ai_chat.router, prefix="/api/ai-chat", tags=["ai-chat"])
-# app.include_router(evaluation.router, prefix="/api", tags=["evaluation"])
+app.include_router(evaluation.router, prefix="/api", tags=["evaluation"])

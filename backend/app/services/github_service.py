@@ -430,7 +430,7 @@ class GitHubService:
 
             repo = self.github_client.get_repo(full_name)
 
-            commits = list(repo.get_commits()[:max_commits])
+            commits = list(repo.get_commits())[:max_commits]
 
             commit_analysis = {
                 "total_commits": len(commits),

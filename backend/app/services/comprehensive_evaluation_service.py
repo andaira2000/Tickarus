@@ -2,12 +2,12 @@ import time
 import json
 from typing import List, Dict, Any, Optional, Tuple
 from uuid import UUID
-from datetime import datetime, timedelta
+from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
 import logging
 
-from app.db.database import get_supabase, get_service_client, exec_query
+from app.db.database import get_service_client
 from app.services.metrics_service import MetricsService
 from app.services.similarity_service import SimilarityService
 from app.services.rootcause_service import rootcause_service
@@ -357,12 +357,8 @@ class ComprehensiveEvaluationService:
                         "report-engine",
                     ]
                 ),
-                "table1": random.choice(
-                    ["users", "orders", "payments", "sessions"]
-                ),
-                "table2": random.choice(
-                    ["profiles", "transactions", "logs", "audit"]
-                ),
+                "table1": random.choice(["users", "orders", "payments", "sessions"]),
+                "table2": random.choice(["profiles", "transactions", "logs", "audit"]),
                 "timeout": random.choice(["5", "10", "30", "60"]),
                 "impact": random.choice(
                     [
@@ -406,18 +402,14 @@ class ComprehensiveEvaluationService:
                 ),
                 "error_rate": random.choice(["15", "25", "40", "60"]),
                 "browser": random.choice(["Chrome", "Firefox", "Safari", "Edge"]),
-                "user_group": random.choice(
-                    ["mobile", "desktop", "admin", "premium"]
-                ),
+                "user_group": random.choice(["mobile", "desktop", "admin", "premium"]),
                 "service": random.choice(
                     ["database", "redis-cache", "elasticsearch", "external-api"]
                 ),
                 "functionality": random.choice(
                     ["search", "notifications", "real-time updates", "data sync"]
                 ),
-                "environment": random.choice(
-                    ["production", "staging", "development"]
-                ),
+                "environment": random.choice(["production", "staging", "development"]),
                 "config_item": random.choice(
                     ["database_url", "redis_connection", "api_timeout", "log_level"]
                 ),
@@ -548,7 +540,6 @@ class ComprehensiveEvaluationService:
         # Build evaluation data for response
         all_ticket_ids = [str(tid) for tid in created_tickets]
 
-
         # Add ground truth for CI failure tickets
         if include_commit_failures:
             # Get the CI failure tickets (they were added last)
@@ -560,7 +551,6 @@ class ComprehensiveEvaluationService:
             for ticket_id in ci_tickets:
                 ground_truth_tags[str(ticket_id)] = ["testing", "infrastructure"]
                 ground_truth_priorities[str(ticket_id)] = "medium"
-
 
         return {
             "dataset_id": str(dataset_id),

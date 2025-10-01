@@ -129,21 +129,11 @@ async def generate_test_data(
 ):
     """Generate synthetic test data"""
     try:
-        result = await evaluation_service.generate_test_dataset(
+        return await evaluation_service.generate_test_dataset(
             num_tickets=request.num_tickets,
             num_similar_groups=request.num_similar_groups,
             include_commit_failures=request.include_commit_failures,
         )
-
-        return {
-            "message": "Test data generated successfully",
-            "tickets_created": result["tickets_created"],
-            "similar_groups": result["similar_groups"],
-            "commit_failure_tickets": result["commit_failure_tickets"],
-            "test_dataset_id": result["dataset_id"],
-            "ticket_ids": result["ticket_ids"],
-            "evaluation_request": result["evaluation_request"],
-        }
 
     except Exception as e:
         raise HTTPException(

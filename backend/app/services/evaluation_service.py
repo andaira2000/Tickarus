@@ -1,7 +1,7 @@
 import logging
 import random
 import time
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from dataclasses import dataclass
@@ -12,9 +12,12 @@ import numpy as np
 
 from app.db.database import get_service_client
 from app.services.metrics_service import MetricsService
-from app.services.similarity_service import SimilarityService
+from app.services.similarity_service import similarity_service
 from app.services.rootcause_service import rootcause_service
 from app.services.auto_tagging_service import auto_tagging_service
+from app.services.ticket_service import TicketService
+from app.models.ticket import TicketCreate
+
 
 logger = logging.getLogger(__name__)
 
@@ -37,32 +40,15 @@ class EvaluationResult:
 
 
 class EvaluationService:
-
-    def __init__(self):
-        self.similarity_service = SimilarityService()
-
-    @staticmethod
-    def _c():
-        return get_supabase()
-
     async def generate_test_dataset(
         self,
         num_tickets: int = 50,
         num_similar_groups: int = 10,
         include_commit_failures: bool = True,
     ) -> Dict[str, Any]:
-        """Generate synthetic test data for dissertation evaluation"""
-        c = get_service_client()
+        """Generate synthetic test data."""
+        supabase_client = get_service_client()
 
-        # Import here to avoid circular imports
-        from app.services.ticket_service import TicketService
-        from app.services.actor_service import ActorService
-        from app.models.ticket import TicketCreate
-        from uuid import uuid4
-        import random
-
-        # Enhanced ticket templates matching auto-tagging service capabilities
-        # Tags aligned with tag_descriptions in auto_tagging_service.py
         ticket_templates = [
             {
                 "title_template": "Database deadlock detected in {component}",
@@ -136,55 +122,49 @@ class EvaluationService:
             },
         ]
 
-        # Get actors for creating tickets (prefer human, fallback to system)
-        test_actors = exec_query(
-            c.table("actors")
+        test_actors = (
+            await supabase_client.table("actors")
             .select("id, actor_type")
             .eq("actor_type", "human")
             .limit(5)
+            .execute()
         ).data
 
         if not test_actors:
             # Fallback to system actors if no human actors exist
-            test_actors = exec_query(
-                c.table("actors")
+            test_actors = (
+                await supabase_client.table("actors")
                 .select("id, actor_type")
                 .eq("actor_type", "system")
                 .limit(5)
+                .execute()
             ).data
 
         if not test_actors:
-            raise Exception(
-                "No actors found for test data generation. Please create at least one user account first."
-            )
+            raise Exception("No actors found for test data generation")
 
         # Get all existing teams to randomly distribute tickets
-        teams_resp = exec_query(c.table("teams").select("id"))
+        teams = (await supabase_client.table("teams").select("id").execute()).data
 
-        if not teams_resp.data:
-            raise Exception("No teams found. Please create at least one team first.")
-
-        available_teams = [UUID(team["id"]) for team in teams_resp.data]
+        available_teams = [UUID(team["id"]) for team in teams]
 
         def get_random_team_id():
-            """Helper function to get a random team ID from available teams"""
             return random.choice(available_teams)
 
         created_tickets = []
         similar_groups = {}
 
-        # Initialize ground truth data for evaluation
         ground_truth_tags = {}
         ground_truth_priorities = {}
 
         # Create similar ticket groups
         for group_idx in range(num_similar_groups):
             template = random.choice(ticket_templates)
-            tickets_in_group = random.randint(2, 5)  # 2-5 similar tickets per group
+            tickets_in_group = random.randint(2, 5)
             group_tickets = []
 
             for i in range(tickets_in_group):
-                # Generate specific variations based on template needs
+                # Generate specific variations based on templates
                 variations = {
                     "component": random.choice(
                         [
@@ -322,18 +302,16 @@ class EvaluationService:
                     description=description,
                     team_id=get_random_team_id(),
                     priority=template["priority"],
-                    tags=template["tags"] + [f"test-group-{group_idx}"],
                 )
 
                 actor_id = UUID(random.choice(test_actors)["id"])
                 ticket = await TicketService.create_ticket(
-                    ticket_payload, actor_id, client=c
+                    ticket_payload, actor_id, supabase_client
                 )
 
                 created_tickets.append(ticket.id)
                 group_tickets.append(str(ticket.id))
 
-                # Set ground truth for this ticket using the actual template used
                 ground_truth_tags[str(ticket.id)] = template["tags"]
                 ground_truth_priorities[str(ticket.id)] = template["priority"]
 
@@ -471,12 +449,11 @@ class EvaluationService:
                 description=description,
                 team_id=get_random_team_id(),
                 priority=random.choice(["low", "medium", "high"]),
-                tags=template["tags"] + ["random-test"],
             )
 
             actor_id = UUID(random.choice(test_actors)["id"])
             ticket = await TicketService.create_ticket(
-                ticket_payload, actor_id, client=c
+                ticket_payload, actor_id, supabase_client
             )
             created_tickets.append(ticket.id)
 
@@ -488,32 +465,30 @@ class EvaluationService:
         commit_failure_tickets = 0
         if include_commit_failures:
             # Simulate CI automation creating tickets
-            ci_bot_resp = exec_query(
-                c.table("actors")
+            ci_bot = (
+                await supabase_client.table("actors")
                 .select("id")
                 .eq("system_user_id", "00000000-0000-4000-8000-000000000001")
                 .single()
-            )
+                .execute()
+            ).data
 
-            if ci_bot_resp.data:
-                ci_actor_id = UUID(ci_bot_resp.data["id"])
+            ci_actor_id = UUID(ci_bot["id"])
 
-                for i in range(5):  # Create 5 CI failure tickets
-                    ticket_payload = TicketCreate(
-                        title=f"CI Build Failure - Commit {random.randint(1000, 9999)}",
-                        description=f"Build failed in repository test-repo-{i+1}. Error: {random.choice(['compilation error', 'test failure', 'linting error', 'dependency issue'])}. Branch: {random.choice(['main', 'develop', 'feature/test'])}",
-                        team_id=get_random_team_id(),
-                        priority="high",
-                        tags=["ci", "build-failure", "automated"],
-                    )
+            for i in range(5):
+                ticket_payload = TicketCreate(
+                    title=f"CI Build Failure - Commit {random.randint(1000, 9999)}",
+                    description=f"Build failed in repository test-repo-{i+1}. Error: {random.choice(['compilation error', 'test failure', 'linting error', 'dependency issue'])}. Branch: {random.choice(['main', 'develop', 'feature/test'])}",
+                    team_id=get_random_team_id(),
+                    priority="high",
+                )
 
-                    ticket = await TicketService.create_ticket(
-                        ticket_payload, ci_actor_id, client=c
-                    )
-                    created_tickets.append(ticket.id)
-                    commit_failure_tickets += 1
+                ticket = await TicketService.create_ticket(
+                    ticket_payload, ci_actor_id, supabase_client
+                )
+                created_tickets.append(ticket.id)
+                commit_failure_tickets += 1
 
-        # Store test dataset metadata
         dataset_id = uuid4()
         dataset_metadata = {
             "id": str(dataset_id),
@@ -524,32 +499,27 @@ class EvaluationService:
             "ticket_ids": [str(tid) for tid in created_tickets],
         }
 
-        # Store in database for future reference
-        exec_query(
-            c.table("evaluation_datasets").insert(
-                {
-                    "id": str(dataset_id),
-                    "dataset_type": "comprehensive_test",
-                    "metadata": dataset_metadata,
-                    "created_at": datetime.utcnow().isoformat(),
-                }
-            )
-        )
+        await supabase_client.table("evaluation_datasets").insert(
+            {
+                "id": str(dataset_id),
+                "dataset_type": "comprehensive_test",
+                "metadata": dataset_metadata,
+                "created_at": datetime.utcnow().isoformat(),
+            }
+        ).execute()
 
-        # Build evaluation data for response
         all_ticket_ids = [str(tid) for tid in created_tickets]
 
         # Add ground truth for CI failure tickets
         if include_commit_failures:
-            # Get the CI failure tickets (they were added last)
             ci_tickets = (
                 created_tickets[-commit_failure_tickets:]
                 if commit_failure_tickets > 0
                 else []
             )
             for ticket_id in ci_tickets:
-                ground_truth_tags[str(ticket_id)] = ["testing", "infrastructure"]
-                ground_truth_priorities[str(ticket_id)] = "medium"
+                ground_truth_tags[str(ticket_id)] = ["testing"]
+                ground_truth_priorities[str(ticket_id)] = "high"
 
         return {
             "dataset_id": str(dataset_id),
@@ -557,12 +527,8 @@ class EvaluationService:
             "similar_groups": similar_groups,
             "commit_failure_tickets": commit_failure_tickets,
             "ticket_ids": all_ticket_ids,
-            # Ready-to-use evaluation request format
-            "evaluation_request": {
-                "test_ticket_ids": all_ticket_ids,
-                "ground_truth_tags": ground_truth_tags,
-                "ground_truth_priorities": ground_truth_priorities,
-            },
+            "ground_truth_tags": ground_truth_tags,
+            "ground_truth_priorities": ground_truth_priorities,
         }
 
     async def evaluate_similarity_accuracy(
@@ -571,51 +537,40 @@ class EvaluationService:
         ground_truth_similar: Dict[UUID, List[UUID]],
         top_k: int = 3,
     ) -> EvaluationResult:
-        start_time = time.time()
+        supabase_client = get_service_client()
 
+        start_time = time.time()
         total_hits = 0
         total_predicted = 0
         total_relevant = 0
         individual_results = []
 
-        c = get_service_client()
-
         for ticket_id in test_tickets:
             try:
-                # Get ticket content
-                ticket_resp = exec_query(
-                    c.table("tickets")
+                ticket = (
+                    await supabase_client.table("tickets")
                     .select("title, description")
                     .eq("id", str(ticket_id))
                     .single()
-                )
+                    .execute()
+                ).data
 
-                if not ticket_resp.data:
-                    continue
-
-                ticket = ticket_resp.data
                 ticket_text = f"{ticket['title']} {ticket.get('description', '')}"
 
-                # Get AI similarity suggestions
-                similar_tickets = await self.similarity_service.find_similar_tickets(
+                similar_tickets = await similarity_service.find_similar_tickets(
                     ticket_text=ticket_text,
                     current_ticket_id=ticket_id,
                     limit=top_k,
-                    user_id=None,
-                    client=c,
                 )
 
-                # Extract predicted similar ticket IDs
                 predicted_ids = {UUID(t["id"]) for t in similar_tickets}
                 ground_truth_ids = set(ground_truth_similar.get(ticket_id, []))
 
-                # Calculate metrics
                 hits = len(predicted_ids.intersection(ground_truth_ids))
                 total_hits += hits
                 total_predicted += len(predicted_ids)
                 total_relevant += len(ground_truth_ids)
 
-                # Individual ticket result
                 ticket_precision = hits / len(predicted_ids) if predicted_ids else 0
                 ticket_recall = hits / len(ground_truth_ids) if ground_truth_ids else 0
 
@@ -627,7 +582,7 @@ class EvaluationService:
                         "hits": hits,
                         "precision": ticket_precision,
                         "recall": ticket_recall,
-                        "accuracy_at_k": 1 if hits > 0 else 0,  # Hit rate at k
+                        "accuracy_at_k": 1 if hits > 0 else 0,
                     }
                 )
 
@@ -637,7 +592,6 @@ class EvaluationService:
                 )
                 continue
 
-        # Calculate overall metrics
         precision = total_hits / total_predicted if total_predicted > 0 else 0
         recall = total_hits / total_relevant if total_relevant > 0 else 0
         f1_score = (
@@ -650,11 +604,10 @@ class EvaluationService:
         accuracy_at_k = (
             sum(r["accuracy_at_k"] for r in individual_results)
             / len(individual_results)
-            if individual_results
+            if len(individual_results) > 0
             else 0
         )
 
-        # Log evaluation metrics
         await MetricsService.log_event(
             event_type="similarity_evaluation_completed",
             ai_feature="similarity",
@@ -667,14 +620,9 @@ class EvaluationService:
                 "accuracy_at_k": accuracy_at_k,
             },
             response_time_ms=int((time.time() - start_time) * 1000),
-            client=c,
         )
 
-        # Create evaluation result
-        from uuid import uuid4
-
         evaluation_id = uuid4()
-
         result = EvaluationResult(
             evaluation_id=evaluation_id,
             evaluation_type="similarity_accuracy",
@@ -698,9 +646,9 @@ class EvaluationService:
             timestamp=datetime.utcnow(),
         )
 
-        # Store result in database
-        exec_query(
-            c.table("evaluation_results").insert(
+        (
+            await supabase_client.table("evaluation_results")
+            .insert(
                 {
                     "id": str(evaluation_id),
                     "evaluation_type": "similarity_accuracy",
@@ -710,6 +658,7 @@ class EvaluationService:
                     "created_at": result.timestamp.isoformat(),
                 }
             )
+            .execute()
         )
 
         return result
@@ -720,21 +669,9 @@ class EvaluationService:
         ground_truth_tags: Dict[UUID, List[str]],
         ground_truth_priorities: Dict[UUID, str],
     ) -> EvaluationResult:
-        """
-        Evaluate auto-tagging and prioritization accuracy
-        Benchmarked against human-labeled test set
+        supabase_client = get_service_client()
 
-        Args:
-            test_tickets: List of ticket IDs to test
-            ground_truth_tags: Dict mapping ticket_id -> list of correct tags
-            ground_truth_priorities: Dict mapping ticket_id -> correct priority
-
-        Returns:
-            EvaluationResult with tag and priority accuracy metrics
-        """
         start_time = time.time()
-
-        c = get_service_client()
         individual_results = []
         tag_hits = 0
         tag_predicted = 0
@@ -744,25 +681,17 @@ class EvaluationService:
 
         for ticket_id in test_tickets:
             try:
-                # Get ticket content
-                ticket_resp = exec_query(
-                    c.table("tickets")
+                ticket = (
+                    await supabase_client.table("tickets")
                     .select("title, description")
                     .eq("id", str(ticket_id))
                     .single()
-                )
+                    .execute()
+                ).data
 
-                if not ticket_resp.data:
-                    continue
-
-                ticket = ticket_resp.data
-
-                # Perform AI auto-tagging
                 tagging_result = await auto_tagging_service.auto_tag_ticket(
                     title=ticket["title"],
                     description=ticket.get("description", ""),
-                    user_id=None,
-                    client=c,
                 )
 
                 predicted_tags = set(tagging_result.get("suggested_tags", []))
@@ -771,13 +700,11 @@ class EvaluationService:
                 ground_truth_tag_set = set(ground_truth_tags.get(ticket_id, []))
                 ground_truth_priority = ground_truth_priorities.get(ticket_id, "medium")
 
-                # Calculate tag metrics
                 tag_intersection = predicted_tags.intersection(ground_truth_tag_set)
                 tag_hits += len(tag_intersection)
                 tag_predicted += len(predicted_tags)
                 tag_relevant += len(ground_truth_tag_set)
 
-                # Calculate priority accuracy
                 priority_match = (
                     predicted_priority.lower() == ground_truth_priority.lower()
                 )
@@ -803,7 +730,6 @@ class EvaluationService:
                 )
                 continue
 
-        # Calculate overall metrics
         tag_precision = tag_hits / tag_predicted if tag_predicted > 0 else 0
         tag_recall = tag_hits / tag_relevant if tag_relevant > 0 else 0
         tag_f1 = (
@@ -815,7 +741,6 @@ class EvaluationService:
             priority_correct / priority_total if priority_total > 0 else 0
         )
 
-        # Log evaluation metrics
         await MetricsService.log_event(
             event_type="tagging_evaluation_completed",
             ai_feature="auto_tagging",
@@ -827,14 +752,9 @@ class EvaluationService:
                 "priority_accuracy": priority_accuracy,
             },
             response_time_ms=int((time.time() - start_time) * 1000),
-            client=c,
         )
 
-        # Create evaluation result
-        from uuid import uuid4
-
         evaluation_id = uuid4()
-
         result = EvaluationResult(
             evaluation_id=evaluation_id,
             evaluation_type="tagging_accuracy",
@@ -854,12 +774,12 @@ class EvaluationService:
                 "test_parameters": {"test_tickets_count": len(test_tickets)},
             },
             summary=f"Tagging evaluation: Tags F1 {tag_f1:.3f}, Priority accuracy {priority_accuracy:.1%}",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
 
-        # Store result in database
-        exec_query(
-            c.table("evaluation_results").insert(
+        (
+            await supabase_client.table("evaluation_results")
+            .insert(
                 {
                     "id": str(evaluation_id),
                     "evaluation_type": "tagging_accuracy",
@@ -869,6 +789,7 @@ class EvaluationService:
                     "created_at": result.timestamp.isoformat(),
                 }
             )
+            .execute()
         )
 
         return result
@@ -925,7 +846,7 @@ class EvaluationService:
                             ticket_text = (
                                 f"{ticket['title']} {ticket.get('description', '')}"
                             )
-                            await self.similarity_service.find_similar_tickets(
+                            await similarity_service.find_similar_tickets(
                                 ticket_text=ticket_text,
                                 current_ticket_id=ticket_id,
                                 limit=3,

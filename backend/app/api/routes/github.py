@@ -18,7 +18,7 @@ from app.models.github_repository import (
 from app.services.github_service import github_service
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/github", tags=["GitHub Integration"])
+router = APIRouter(prefix="/github")
 
 
 @router.get("/health")

@@ -11,7 +11,7 @@ export function AuthLayout({ children, title, description }: AuthLayoutProps) {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <h1 className="text-2xl font-bold text-blue-600 mb-2">Tickarus</h1>
+          <h1 className="text-2xl font-bold text-teal-600 mb-2">Tickarus</h1>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>

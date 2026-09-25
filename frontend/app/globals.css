@@ -120,3 +120,19 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Metallic purple text: a dark-bright-dark gradient clipped to the letters */
+@utility text-metallic-purple {
+  background-image: linear-gradient(
+    135deg,
+    #3b0764 0%,
+    #6d28d9 30%,
+    #a855f7 50%,
+    #6d28d9 70%,
+    #3b0764 100%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  text-decoration-color: #6d28d9;
+}

@@ -114,7 +114,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className={`flex grow flex-col gap-y-5 overflow-y-auto bg-white py-4 shadow-sm ${sidebarOpen ? 'px-6' : 'px-2'} transition-all duration-300`}>
           <div className={`flex h-16 shrink-0 items-center ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
             {sidebarOpen && (
-              <h1 className="text-2xl font-bold text-teal-600 text-center">Tickarus</h1>
+              <h1 className="text-2xl font-bold text-metallic-purple text-center">Tickarus</h1>
             )}
             <Button
               variant="ghost"

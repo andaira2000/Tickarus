@@ -21,9 +21,8 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-blue-600 mb-4">Tickarus</h1>
-        <p className="text-gray-600 mb-8">Modern Ticket Management System</p>
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        <h1 className="text-4xl font-bold text-metallic-purple mb-6">Tickarus</h1>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-700 mx-auto"></div>
       </div>
     </div>
   );

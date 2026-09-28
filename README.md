@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <a href="https://tickarus.vercel.app"><img src="https://img.shields.io/badge/▶_Live_demo-tickarus.vercel.app-000000?style=flat&logo=vercel&logoColor=white&labelColor=555555" alt="Live demo on Vercel"></a>
+  <a href="https://tickarus.vercel.app"><img src="https://img.shields.io/badge/▶-tickarus.vercel.app-7B3FE4?style=flat&labelColor=555555" alt="Live demo on Vercel"></a>
 </p>
 
 https://github.com/user-attachments/assets/c4517a44-03dc-48db-a2c4-48304253e8e1

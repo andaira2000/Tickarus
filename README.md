@@ -6,14 +6,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Next.js_15-4B2A7B?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js 15">
-  <img src="https://img.shields.io/badge/FastAPI-4B2A7B?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
-  <img src="https://img.shields.io/badge/Supabase-4B2A7B?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase">
-  <img src="https://img.shields.io/badge/Claude_%2F_OpenAI-4B2A7B?style=for-the-badge&logo=anthropic&logoColor=white" alt="Anthropic Claude or OpenAI">
+  <img src="https://img.shields.io/badge/Next.js_15-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js 15">
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase">
+  <img src="https://img.shields.io/badge/Claude_%2F_OpenAI-D97757?style=for-the-badge&logo=anthropic&logoColor=white" alt="Anthropic Claude or OpenAI">
 </p>
 
 <p align="center">
-  <a href="https://tickarus.vercel.app"><img src="https://img.shields.io/badge/Open_the_live_app-tickarus.vercel.app-9B6DD6?style=for-the-badge&logo=vercel&logoColor=white&labelColor=4B2A7B" alt="Live demo on Vercel"></a>
+  <a href="https://tickarus.vercel.app"><img src="https://img.shields.io/badge/▶_Live_demo-tickarus.vercel.app-000000?style=flat&logo=vercel&logoColor=white&labelColor=555555" alt="Live demo on Vercel"></a>
 </p>
 
 https://github.com/user-attachments/assets/c4517a44-03dc-48db-a2c4-48304253e8e1

@@ -6,7 +6,7 @@ AI-enhanced issue-tracking platform. Tickarus augments a standard ticketing work
 
 ## Demo video
 
-https://github.com/andaira2000/Tickarus/releases/download/demo-v1/Demo.mp4
+https://github.com/user-attachments/assets/c4517a44-03dc-48db-a2c4-48304253e8e1
 
 ## Features
 

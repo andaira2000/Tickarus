@@ -86,14 +86,15 @@ cd Tickarus
 
 ## Does the AI actually help?
 
-Tickarus was built as a research project, and each AI feature was measured. The full write-up is in [`overall_evaluation.md`](overall_evaluation.md).
+Tickarus was built as a research project, and each AI feature was measured on a labelled set of 55 test tickets. The raw results, down to each ticket, are in [`evaluation_results/`](evaluation_results).
 
 | Question                                     | Result                                                                                 |
 | -------------------------------------------- | -------------------------------------------------------------------------------------- |
 | Is the real duplicate in the top 3?          | **65.4%** of the time (accuracy@3)                                                     |
 | Is the root-cause analysis any good?         | **86.7%** of analyses were within 1 point of a human rating on a 1–5 scale              |
 | How does it hold up under load?              | **0% errors** at every level tested. Peak 3.48 req/s at 25 concurrent users. Slows down beyond that |
-| Are the auto-tags right?                     | Not yet. Tag F1 is **0.11** and priority accuracy is **40%**. This is the weakest feature |
+| Are the suggested tags right?                | Tag F1 of **0.617** (precision 0.59, recall 0.65) across multiple tags per ticket |
+| Is the suggested priority right?             | **85.5%** correct (47 of 55 tickets)                                               |
 
 ## Quick Start
 
@@ -292,7 +293,7 @@ POST   /api/evaluation/generate-test-data          → Seed synthetic tickets
 ```
 Tickarus/
 ├── .github/workflows/deploy.yml      # OIDC → CodeBuild → Lambda
-├── overall_evaluation.md             # AI evaluation results
+├── evaluation_results/              # Similarity, tagging and load test results (JSON)
 ├── backend/                          # FastAPI
 │   ├── Dockerfile                    # Lambda container image
 │   ├── buildspec.yml                 # CodeBuild: build, push to ECR, update Lambda
